@@ -7,7 +7,7 @@ lazy_static! {
     pub static ref UNICODE: HashMap<u32, Codepoint> = unicode();
 }
 
-const DATA: &str = include_str!("./../data/ucd/15.0.0/UnicodeData.txt");
+const DATA: &str = include_str!("./../data/ucd/15.1.0/UnicodeData.txt");
 
 /// разбор UnicodeData.txt из UCD и составление хешмапа свойств символов Unicode
 pub fn unicode() -> HashMap<u32, Codepoint>

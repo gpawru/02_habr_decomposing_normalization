@@ -17,7 +17,7 @@ lazy_static! {
     pub static ref NORMALIZATION_TESTS: Vec<NormalizationTest> = normalization_tests();
 }
 
-const DATA: &str = include_str!("./../data/ucd/15.0.0/NormalizationTest.txt");
+const DATA: &str = include_str!("./../data/ucd/15.1.0/NormalizationTest.txt");
 
 /// разбор NormalizationTest.txt из UCD
 fn normalization_tests() -> Vec<NormalizationTest>

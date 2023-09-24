@@ -31,7 +31,7 @@ fn main()
         from, to
     );
 
-    println!("стартеров: {}, не-стартеров: {}\n", starters, non_starters);
+    println!("стартеров (записанных в UnicodeData.txt): {}, не-стартеров: {}\n", starters, non_starters);
 }
 
 /*
