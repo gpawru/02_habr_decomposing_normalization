@@ -9,7 +9,7 @@ group!(
     test_nfd,
     "nfd",
     "icu",
-    DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
+    DecomposingNormalizer::new_nfd()
 );
 
 group!(
@@ -18,7 +18,7 @@ group!(
     test_nfkd,
     "nfkd",
     "icu",
-    DecomposingNormalizer::try_new_nfkd_unstable(&icu_testdata::unstable()).unwrap()
+    DecomposingNormalizer::new_nfkd()
 );
 
 group!(
@@ -27,7 +27,7 @@ group!(
     test_dec,
     "dec",
     "icu",
-    DecomposingNormalizer::try_new_nfd_unstable(&icu_testdata::unstable()).unwrap()
+    DecomposingNormalizer::new_nfd()
 );
 
 criterion_group!(benches, nfd, nfkd, dec);

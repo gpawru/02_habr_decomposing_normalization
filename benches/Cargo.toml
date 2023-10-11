@@ -5,8 +5,7 @@ edition = "2021"
 
 [dev-dependencies]
 criterion = "0.5.1"
-icu_normalizer = "1.2.0"
-icu_testdata = "1.2.0"
+icu_normalizer = "1.3.2"
 
 unicode_decomposing_v1 = { path = "./../decomposing/1_base" }
 unicode_decomposing_v2 = { path = "./../decomposing/2_opt" }
