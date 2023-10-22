@@ -137,7 +137,7 @@ impl<'a> DecomposingNormalizer<'a>
         let lvt = code.wrapping_sub(HANGUL_S_BASE);
 
         if lvt > HANGUL_S_COUNT {
-            return parse_data_value(*self.get_decomposition_value(&code));
+            return parse_data_value(self.get_decomposition_value(code));
         };
 
         decompose_hangul(lvt)
@@ -145,20 +145,20 @@ impl<'a> DecomposingNormalizer<'a>
 
     /// данные о декомпозиции символа
     #[inline(always)]
-    fn get_decomposition_value(&self, code: &u32) -> &u64
+    fn get_decomposition_value(&self, code: u32) -> u64
     {
-        match *code <= self.continuous_block_end {
-            true => &self.data[*code as usize],
+        match code <= self.continuous_block_end {
+            true => self.data[code as usize],
             false => {
                 let block_index = (code >> 7) as usize;
                 let block = self.index[block_index] as usize;
 
                 let block_offset = block << 7;
-                let code_offset = ((*code as u8) & 0x7F) as usize;
+                let code_offset = ((code as u8) & 0x7F) as usize;
 
                 let index = block_offset | code_offset;
 
-                &self.data[index as usize]
+                self.data[index]
             }
         }
     }

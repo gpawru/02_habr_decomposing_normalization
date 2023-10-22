@@ -211,7 +211,7 @@ impl<'a> DecomposingNormalizer<'a>
                 let block_offset = block << 7;
                 let code_offset = ((code as u8) & 0x7F) as usize;
 
-                let index = block_offset + code_offset;
+                let index = block_offset | code_offset;
 
                 self.data[index]
             }
