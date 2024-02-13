@@ -3,15 +3,17 @@ use unicode_normalization_source::{properties::*, UNICODE};
 use crate::output::stats::CodepointGroups;
 
 /// стартер без декомпозиции
-pub const MARKER_STARTER: u64 = 0;
-/// не-стартер без декомпозиции
-pub const MARKER_NON_STARTER: u64 = 1;
+pub const MARKER_STARTER: u64 = 0b_000;
+/// нестартер без декомпозиции
+pub const MARKER_NONSTARTER: u64 = 0b_001;
 /// 16-битная пара
-pub const MARKER_PAIR: u64 = 2;
+pub const MARKER_PAIR: u64 = 0b_010;
 /// синглтон
-pub const MARKER_SINGLETON: u64 = 3;
+pub const MARKER_SINGLETON: u64 = 0b_011;
 /// декомпозиция, вынесенная во внешний блок
-pub const MARKER_EXPANSION: u64 = 4;
+pub const MARKER_EXPANSION: u64 = 0b_100;
+/// слог хангыль
+pub const MARKER_HANGUL: u64 = 0b_101;
 
 /// закодировать кодпоинт для таблицы данных
 pub fn encode_codepoint(
@@ -26,20 +28,22 @@ pub fn encode_codepoint(
         false => &codepoint.compat_decomposition,
     };
 
-    let value = [
-        starter,                  // стартер
-        nonstarter,               // не-стартер
-        singleton,                // синглтон
-        pair16,                   // пара (16 бит)
-        triple16,                 // тройка (16 бит)
-        pair18,                   // пара (18 бит)
-        starter_to_nonstarters,   // стартер в не-стартеры
-        nonstarter_decomposition, // не-стартер с декомпозицией в стартер
-        triple18,                 // тройка (18 бит)
-        long_decomposition,       // декомпозиция > 3 символов
-    ]
-    .iter()
-    .find_map(|f| f(codepoint, decomposition, expansion_position, stats));
+    let variants = &[
+        starter,
+        nonstarter,
+        singleton,
+        pair16,
+        triple16,
+        pair18,
+        starter_to_nonstarters,
+        nonstarter_decomposition,
+        triple18,
+        long_decomposition,
+    ];
+
+    let value = variants
+        .iter()
+        .find_map(|f| f(codepoint, decomposition, expansion_position, stats));
 
     match value {
         Some(value) => value,
@@ -81,7 +85,7 @@ fn starter(
     Some((value, vec![]))
 }
 
-/// не-стартер:
+/// нестартер:
 ///     - ССС > 0
 ///     - нет декомпозиции
 fn nonstarter(
@@ -91,15 +95,15 @@ fn nonstarter(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_non_starter() || !decomposition.is_empty() {
+    if !codepoint.ccc.is_nonstarter() || !decomposition.is_empty() {
         return None;
     }
 
     let ccc = u64::from(codepoint.ccc);
 
-    let value = MARKER_NON_STARTER | (ccc << 8);
+    let value = MARKER_NONSTARTER | (ccc << 8);
 
-    to_stats(stats, "1. не-стартеры", codepoint, decomposition);
+    to_stats(stats, "1. нестартеры", codepoint, decomposition);
     Some((value, vec![]))
 }
 
@@ -219,9 +223,9 @@ fn pair18(
     Some((value, map_expansion(decomposition)))
 }
 
-/// стартер с декомпозицией в не-стартеры
+/// стартер с декомпозицией в нестартеры
 ///     - стартер
-///     - есть декомпозиция, которая состоит из не-стартеров
+///     - есть декомпозиция, которая состоит из нестартеров
 fn starter_to_nonstarters(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
@@ -231,7 +235,7 @@ fn starter_to_nonstarters(
 {
     if !codepoint.ccc.is_starter()
         || decomposition.is_empty()
-        || !decomposition.iter().all(|&c| get_ccc(c).is_non_starter())
+        || !decomposition.iter().all(|&c| get_ccc(c).is_nonstarter())
     {
         return None;
     }
@@ -240,12 +244,12 @@ fn starter_to_nonstarters(
         | ((decomposition.len() as u64) << 8)
         | ((expansion_position as u64) << 16);
 
-    to_stats(stats, "6. стартеры в не-стартеры", codepoint, decomposition);
+    to_stats(stats, "6. стартеры в нестартеры", codepoint, decomposition);
     Some((value, map_expansion(decomposition)))
 }
 
-/// не-стартер с декомпозицией
-///     - не-стартер
+/// нестартер с декомпозицией
+///     - нестартер
 ///     - есть декомпозиция
 fn nonstarter_decomposition(
     codepoint: &Codepoint,
@@ -254,7 +258,7 @@ fn nonstarter_decomposition(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_non_starter() || decomposition.is_empty() {
+    if !codepoint.ccc.is_nonstarter() || decomposition.is_empty() {
         return None;
     }
 
@@ -264,7 +268,7 @@ fn nonstarter_decomposition(
 
     to_stats(
         stats,
-        "7. не-стартеры с декомпозицией",
+        "7. нестартеры с декомпозицией",
         codepoint,
         decomposition,
     );

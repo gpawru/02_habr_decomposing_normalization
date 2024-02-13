@@ -1,7 +1,7 @@
 use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
 
-use unicode_decomposing_v1::DecomposingNormalizer as v1;
-use unicode_decomposing_v2::DecomposingNormalizer as v2;
+use unicode_decomposing::DecomposingNormalizer as optimized;
+// use unicode_decomposing_basic::DecomposingNormalizer as basic;
 
 macro_rules! test {
     ($left: expr, $right: expr, $normalizer: expr, $test: expr, $str: expr) => {
@@ -9,7 +9,7 @@ macro_rules! test {
             $left,
             $normalizer.normalize(&$right),
             stringify!($str),
-            $test.line,
+            $test.line + 1,
             $test.description
         );
     };
@@ -40,7 +40,7 @@ fn ucd_test_nfd()
         };
     }
 
-    test_group!(v1::nfd(), v2::nfd());
+    test_group!(/*basic::nfd(),*/ optimized::nfd());
 }
 
 /// тесты NFKD нормализации из UCD
@@ -67,5 +67,5 @@ fn ucd_test_nfkd()
         };
     }
 
-    test_group!(v1::nfkd(), v2::nfkd());
+    test_group!(/*basic::nfkd(),*/ optimized::nfkd());
 }

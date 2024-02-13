@@ -40,7 +40,7 @@ impl CanonicalCombiningClass
     }
 
     #[inline]
-    pub fn is_non_starter(&self) -> bool
+    pub fn is_nonstarter(&self) -> bool
     {
         self.0 != 0
     }

@@ -23,21 +23,16 @@ pub const HANGUL_S_COUNT: u32 = 11171;
 
 /// декомпозция хангыль
 #[inline(never)]
-pub fn decompose_hangul(lvt: u32) -> DecompositionValue
-{
-    let l = (lvt / HANGUL_N_COUNT) as u8;
-    let v = ((lvt % HANGUL_N_COUNT) / HANGUL_T_COUNT) as u8;
-    let t = (lvt % HANGUL_T_COUNT) as u8;
+pub fn decompose_hangul(lvt: u32) -> DecompositionValue {
+    let l = lvt / HANGUL_N_COUNT;
+    let v = (lvt % HANGUL_N_COUNT) / HANGUL_T_COUNT;
+    let t = lvt % HANGUL_T_COUNT;
 
-    let c0 = 0x80 + l;
-    let c1 = 0xA1 + v;
+    let c0 = HANGUL_L_BASE + l;
+    let c1 = HANGUL_V_BASE + v;
 
-    if t == 0 {
-        return DecompositionValue::HangulPair(c0, c1);
+    match t == 0 {
+        true => DecompositionValue::HangulPair(c0, c1),
+        false => DecompositionValue::HangulTriple(c0, c1, HANGUL_T_BASE + t),
     }
-
-    let c2 = 0x86 | ((0x07 + t) >> 5);
-    let c3 = 0x80 | ((0xA7 + t) & 0x3F);
-
-    DecompositionValue::HangulTriple(c0, c1, c2, c3)
 }

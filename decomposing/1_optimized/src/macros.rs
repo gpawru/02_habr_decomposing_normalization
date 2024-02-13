@@ -1,22 +1,4 @@
 #[macro_export]
-/// отсортировать кодпоинты буфера по CCC, дописать их в строку результата, затем очистить буфер
-macro_rules! flush {
-    ($result: expr, $buffer: expr) => {
-        if !$buffer.is_empty() {
-            if $buffer.len() > 1 {
-                $buffer.sort_by_key(|c| c.ccc);
-            }
-
-            for codepoint in $buffer.iter() {
-                write!($result, codepoint.code);
-            }
-
-            $buffer.clear();
-        }
-    };
-}
-
-#[macro_export]
 /// записать кодпоинт
 macro_rules! write {
     ($result: expr, $($code: expr),+) => {{

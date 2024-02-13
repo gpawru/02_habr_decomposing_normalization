@@ -16,9 +16,9 @@ pub fn write(canonical: bool, file: &mut File, stats_file: &mut File)
 {
     let (index, data, expansions, stats) = crate::tables::prepare(canonical);
 
-    let (name, dec_starts_at) = match canonical {
-        true => ("NFD", 0xC0),
-        false => ("NFKD", 0xA0),
+    let name = match canonical {
+        true => "NFD",
+        false => "NFKD",
     };
 
     let output = format!(
@@ -26,14 +26,12 @@ pub fn write(canonical: bool, file: &mut File, stats_file: &mut File)
             index: &[{}  ],\n  \
             data: &[{}  ],\n  \
             expansions: &[{}  ],\n  \
-            continuous_block_end: 0x{:04X},\n  \
-            dec_starts_at: 0x{:04X},\n\
+            continuous_block_end: 0x{:04X},\n\
         }}\n",
         format_num_vec(index.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(data.as_slice(), FORMAT_STRING_LENGTH),
         format_num_vec(expansions.as_slice(), FORMAT_STRING_LENGTH),
         STARTING_CODEPOINTS_BLOCK,
-        dec_starts_at
     );
 
     write!(file, "{}", output).unwrap();
@@ -44,6 +42,5 @@ pub fn write(canonical: bool, file: &mut File, stats_file: &mut File)
         index.as_slice(),
         data.as_slice(),
         expansions.as_slice(),
-        dec_starts_at,
     );
 }

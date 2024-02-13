@@ -1,28 +1,22 @@
 use decomposition::hangul::*;
 use decomposition::*;
-use slice::aligned::Aligned;
-use slice::iter::CharsIter;
 
 mod data;
 mod decomposition;
 mod macros;
-mod slice;
-mod utf8;
 
 /// нормализатор NF(K)D
 #[repr(align(32))]
 pub struct DecomposingNormalizer<'a>
 {
     /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x7E, в NFKD - 0xA6
-    index: Aligned<'a, u8>,
+    index: &'a [u8],
     /// основные данные
-    data: Aligned<'a, u64>,
+    data: &'a [u64],
     /// данные кодпоинтов, которые не вписываются в основную часть
-    expansions: Aligned<'a, u32>,
+    expansions: &'a [u32],
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
-    /// первый кодпоинт в таблице, имеющий декомпозицию / не-стартер (для NFD - U+00C0, для NFKD - U+00A0)
-    dec_starts_at: u32,
 }
 
 impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a>
@@ -30,11 +24,10 @@ impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a>
     fn from(source: data::DecompositionData<'a>) -> Self
     {
         Self {
-            index: Aligned::from(source.index),
-            data: Aligned::from(source.data),
-            expansions: Aligned::from(source.expansions),
+            index: source.index,
+            data: source.data,
+            expansions: source.expansions,
             continuous_block_end: source.continuous_block_end,
-            dec_starts_at: source.dec_starts_at,
         }
     }
 }
@@ -61,69 +54,18 @@ impl<'a> DecomposingNormalizer<'a>
         let mut result = String::with_capacity(input.len());
         let mut buffer: Vec<Codepoint> = Vec::with_capacity(18);
 
-        let dec_starts_at = self.dec_starts_at;
+        for char in input.chars() {
+            let code = u32::from(char);
 
-        let iter = &mut CharsIter::new(input);
+            // у символа может быть декомпозиция: стартеры пишем в результат, нестартеры - в буфер,
+            // если после нестартера встречаем стартер - сортируем нестартеры, записываем, сбрасываем буфер
 
-        loop {
-            iter.set_breakpoint();
-
-            // цикл для отрезка текста из символов, не имеющих декомпозиций
-
-            let (decomposition, code) = loop {
-                if iter.is_empty() {
+            match self.decompose(code) {
+                DecompositionValue::None => {
                     flush!(result, buffer);
-                    write_str!(result, iter.ending_slice());
-
-                    return result;
+                    write!(result, code);
                 }
-
-                let first = unsafe { utf8::char_first_byte_unchecked(iter) };
-
-                // все ASCII-символы не имеют декомпозиции
-                if first < 0x80 {
-                    continue;
-                }
-
-                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
-
-                // символы в пределах границы блока символов, не имеющих декомпозиции
-                if code < dec_starts_at {
-                    continue;
-                }
-
-                // символ за границами "безопасной зоны". проверяем кейс декомпозиции:
-                // если он является обычным стартером без декомпозиции, то продолжаем цикл
-                let decomposition = self.decompose(code);
-
-                if !decomposition.is_none() {
-                    // не учитываем однобайтовый символ, т.к. ранее мы их отсекли
-                    let width = match code {
-                        0x00 ..= 0x7F => unreachable!(),
-                        0x80 ..= 0x07FF => 2,
-                        0x0800 ..= 0xFFFF => 3,
-                        0x10000 ..= 0x10FFFF => 4,
-                        _ => unreachable!(),
-                    };
-
-                    // если мы получили какую-то последовательность символов без декомпозиции:
-                    //  - сливаем буфер предшествующих этому отрезку не-стартеров
-                    //  - сливаем отрезок от брейкпоинта до предыдущего символа
-
-                    if !iter.at_breakpoint(width) {
-                        flush!(result, buffer);
-                        write_str!(result, iter.block_slice(width));
-                    }
-
-                    break (decomposition, code);
-                }
-            };
-
-            // у символа есть декомпозиция: стартеры пишем в результат, не-стартеры - в буфер,
-            // если после не-стартера встречаем стартер - сортируем не-стартеры, записываем, сбрасываем буфер
-
-            match decomposition {
-                DecompositionValue::NonStarter(ccc) => buffer.push(Codepoint { code, ccc }),
+                DecompositionValue::Nonstarter(ccc) => buffer.push(Codepoint { code, ccc }),
                 DecompositionValue::Pair(c1, c2) => {
                     flush!(result, buffer);
                     write!(result, c1);
@@ -153,11 +95,11 @@ impl<'a> DecomposingNormalizer<'a>
                 }
                 DecompositionValue::HangulPair(c1, c2) => {
                     flush!(result, buffer);
-                    write_str!(result, &[0xE1, 0x84, c1, 0xE1, 0x85, c2]);
+                    write!(result, c1, c2);
                 }
-                DecompositionValue::HangulTriple(c1, c2, c3, c4) => {
+                DecompositionValue::HangulTriple(c1, c2, c3) => {
                     flush!(result, buffer);
-                    write_str!(result, &[0xE1, 0x84, c1, 0xE1, 0x85, c2, 0xE1, c3, c4]);
+                    write!(result, c1, c2, c3);
                 }
                 DecompositionValue::Expansion(index, count) => {
                     for entry in
@@ -175,9 +117,12 @@ impl<'a> DecomposingNormalizer<'a>
                         }
                     }
                 }
-                DecompositionValue::None => unreachable!(),
             }
         }
+
+        flush!(result, buffer);
+
+        result
     }
 
     /// получить декомпозицию символа

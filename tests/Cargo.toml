@@ -5,12 +5,12 @@ edition = "2021"
 publish = false
 
 [dev-dependencies]
-icu_normalizer = "1.3.2"
+icu_normalizer = "1.4.1"
 
 unicode_normalization_source = { path = "./../source" }
 
-unicode_decomposing_v1 = { path = "./../decomposing/1_base" }
-unicode_decomposing_v2 = { path = "./../decomposing/2_opt" }
+# unicode_decomposing_basic = { path = "./../decomposing/0_basic" }
+unicode_decomposing = { path = "./../decomposing/1_optimized" }
 
 [profile.test]
 opt-level = 3

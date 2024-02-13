@@ -1,6 +1,6 @@
 use unicode_normalization_source::UNICODE;
 
-use crate::encode::encode_codepoint;
+use crate::encode::{encode_codepoint, MARKER_HANGUL};
 use crate::output::stats::CodepointGroups;
 
 /// до этого кодпоинта (включительно) все кодпоинты записаны в таблицу данных последовательно
@@ -80,6 +80,26 @@ pub fn prepare<'a>(canonical: bool) -> (Vec<u32>, Vec<u64>, Vec<u32>, CodepointG
             data.extend(block_data);
             last_block = block;
         }
+    }
+
+    // добавляем маркеры для слогов хангыль
+
+    for block in block_for!(0xAC00) .. block_for!(0xD7A3) {
+        assert_eq!(index[block], 0);
+        index[block] = block_for!(data.len()) as u32;
+    }
+    
+    data.extend([MARKER_HANGUL; 1 << BLOCK_BITS as usize]);
+
+    index[block_for!(0xD7A3)] = block_for!(data.len()) as u32;
+
+    for offset in 0 .. 1 << BLOCK_BITS {
+        let value = match code_for!(block_for!(0xD7A3), offset) <= 0xD7A3 {
+            true => MARKER_HANGUL,
+            false => 0,
+        };
+
+        data.push(value);
     }
 
     let index = index[0 ..= last_block as usize].to_vec();

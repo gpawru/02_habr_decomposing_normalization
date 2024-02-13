@@ -17,7 +17,7 @@ fn main()
             continue;
         }
 
-        if codepoint.ccc.is_non_starter() && !codepoint.decomposition.is_empty() {
+        if codepoint.ccc.is_nonstarter() && !codepoint.decomposition.is_empty() {
             ns.push(codepoint.code);
             continue;
         }
@@ -30,8 +30,8 @@ fn main()
                         None => CanonicalCombiningClass::NotReordered,
                     };
 
-                    // стартер с декомпозицией в не-стартер
-                    if codepoint.ccc.is_starter() && first_ccc.is_non_starter() {
+                    // стартер с декомпозицией в нестартер
+                    if codepoint.ccc.is_starter() && first_ccc.is_nonstarter() {
                         $result.insert(codepoint.code, true);
                     }
                 }
@@ -58,13 +58,13 @@ fn main()
         };
     }
 
-    println!("\nстартеры с декомпозицией в не-стартеры:");
+    println!("\nстартеры с декомпозицией в нестартеры:");
 
     print_st!(st_ucd, "UCD");
     print_st!(st_canonical, "каноническая декомпозиция");
     print_st!(st_compat, "декомпозиция совместимости");
 
-    println!("\nне-стартеры с декомпозицией:\n");
+    println!("\nнестартеры с декомпозицией:\n");
 
     ns.sort();
 
@@ -86,7 +86,7 @@ fn main()
 
 результат:
 
-стартеры с декомпозицией в не-стартеры:
+стартеры с декомпозицией в нестартеры:
 
 UCD:
 
@@ -110,7 +110,7 @@ U+0F81 - TIBETAN VOWEL SIGN REVERSED II
 U+FF9E - HALFWIDTH KATAKANA VOICED SOUND MARK
 U+FF9F - HALFWIDTH KATAKANA SEMI-VOICED SOUND MARK
 
-не-стартеры с декомпозицией:
+нестартеры с декомпозицией:
 
 U+0340 - COMBINING GRAVE TONE MARK
   U+0300 (230)

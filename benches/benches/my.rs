@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use unicode_decomposing_v1::DecomposingNormalizer;
+use unicode_decomposing::DecomposingNormalizer;
 
 mod group;
 
@@ -8,7 +8,7 @@ group!(
     nfd,
     test_nfd,
     "nfd",
-    "base",
+    "my",
     DecomposingNormalizer::nfd()
 );
 
@@ -17,9 +17,18 @@ group!(
     nfkd,
     test_nfkd,
     "nfkd",
-    "base",
+    "my",
     DecomposingNormalizer::nfkd()
 );
 
-criterion_group!(benches, nfd, nfkd);
+group!(
+    "./../test_data/texts_decomposed",
+    dec,
+    test_dec,
+    "dec",
+    "my",
+    DecomposingNormalizer::nfd()
+);
+
+criterion_group!(benches, nfd, nfkd, dec);
 criterion_main!(benches);

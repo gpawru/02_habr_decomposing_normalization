@@ -5,23 +5,21 @@ pub mod hangul;
 /// последний кодпоинт с декомпозицией
 pub const LAST_DECOMPOSING_CODEPOINT: u32 = 0x2FA1D;
 
-/// стартер без декомпозиции
-const MARKER_STARTER: u8 = 0;
-/// не-стартер без декомпозиции
-const MARKER_NON_STARTER: u8 = 1;
+/// нестартер без декомпозиции
+const MARKER_NONSTARTER: u8 = 1;
 /// 16-битная пара
 const MARKER_PAIR: u8 = 2;
 /// синглтон
 const MARKER_SINGLETON: u8 = 3;
 /// декомпозиция, вынесенная во внешний блок
 const MARKER_EXPANSION: u8 = 4;
+/// слог хангыль
+const MARKER_HANGUL: u8 = 5;
 
 pub enum DecompositionValue
 {
-    /// стартер, декомпозиция отсутствует
-    None,
-    /// не-стартер (например, диакретический знак)
-    NonStarter(u8),
+    /// нестартер (например, диакретический знак)
+    Nonstarter(u8),
     /// декомпозиция на 2 кодпоинта, первый - стартер
     Pair(u32, Codepoint),
     /// декомпозиция на 3 кодпоинта, первый - стартер
@@ -30,10 +28,8 @@ pub enum DecompositionValue
     Singleton(u32),
     /// декомпозиция на несколько символов, в параметрах - индекс первого элемента в дополнительной таблице и количество этих элементов
     Expansion(u16, u8),
-    /// декомпозиция слога хангыль на 2 чамо. отличие от обычной пары в том, что все символы декомпозиции - стартеры
-    HangulPair(u32, u32),
-    /// декомпозиция слога хангыль на 3 чамо, все элементы декомпозиции - стартеры
-    HangulTriple(u32, u32, u32),
+    /// слог хангыль
+    Hangul,
 }
 
 /// кодпоинт для декомпозиции
@@ -50,20 +46,20 @@ pub struct Codepoint
 pub fn parse_data_value(value: u64) -> DecompositionValue
 {
     match value as u8 {
-        MARKER_STARTER => DecompositionValue::None,
-        MARKER_NON_STARTER => parse_non_starter(value),
         MARKER_PAIR => parse_pair_16bit(value),
+        MARKER_NONSTARTER => parse_nonstarter(value),
         MARKER_SINGLETON => parse_singleton(value),
         MARKER_EXPANSION => parse_expansion(value),
+        MARKER_HANGUL => DecompositionValue::Hangul,
         _ => parse_triple_16bit(value),
     }
 }
 
-/// не-стартер без декомпозиции
+/// нестартер без декомпозиции
 #[inline(always)]
-fn parse_non_starter(value: u64) -> DecompositionValue
+fn parse_nonstarter(value: u64) -> DecompositionValue
 {
-    DecompositionValue::NonStarter(o!(value, u8, 1))
+    DecompositionValue::Nonstarter(o!(value, u8, 1))
 }
 
 /// синглтон

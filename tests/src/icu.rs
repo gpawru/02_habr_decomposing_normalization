@@ -1,6 +1,6 @@
 use icu_normalizer::DecomposingNormalizer as icu;
-use unicode_decomposing_v1::DecomposingNormalizer as v1;
-use unicode_decomposing_v2::DecomposingNormalizer as v2;
+use unicode_decomposing::DecomposingNormalizer as optimized;
+// use unicode_decomposing_basic::DecomposingNormalizer as basic;
 
 /// сравниваем с результатами нормализации ICU
 #[test]
@@ -35,5 +35,5 @@ fn icu()
         };
     }
 
-    test!((v1, "v1"), (v2, "v2"));
+    test!(/* (basic, "basic"),*/ (optimized, "optimized"));
 }
