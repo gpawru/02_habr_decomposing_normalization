@@ -9,7 +9,7 @@ icu_normalizer = "1.4.1"
 
 unicode_normalization_source = { path = "./../source" }
 
-# unicode_decomposing_basic = { path = "./../decomposing/0_basic" }
+unicode_decomposing_basic = { path = "./../decomposing/0_basic" }
 unicode_decomposing = { path = "./../decomposing/1_optimized" }
 
 [profile.test]

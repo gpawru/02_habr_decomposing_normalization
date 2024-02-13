@@ -9,8 +9,6 @@ pub struct DecompositionData<'a>
     pub expansions: &'a [u32],
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     pub continuous_block_end: u32,
-    /// первый кодпоинт в таблице, имеющий декомпозицию / нестартер (для NFD - U+00C0, для NFKD - U+00A0)
-    pub dec_starts_at: u32,
 }
 
 /// данные для NFD-нормализации

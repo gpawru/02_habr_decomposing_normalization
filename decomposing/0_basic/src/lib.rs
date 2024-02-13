@@ -7,8 +7,7 @@ mod macros;
 
 /// нормализатор NF(K)D
 #[repr(align(32))]
-pub struct DecomposingNormalizer<'a>
-{
+pub struct DecomposingNormalizer<'a> {
     /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x7E, в NFKD - 0xA6
     index: &'a [u8],
     /// основные данные
@@ -19,10 +18,8 @@ pub struct DecomposingNormalizer<'a>
     continuous_block_end: u32,
 }
 
-impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a>
-{
-    fn from(source: data::DecompositionData<'a>) -> Self
-    {
+impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a> {
+    fn from(source: data::DecompositionData<'a>) -> Self {
         Self {
             index: source.index,
             data: source.data,
@@ -32,25 +29,21 @@ impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a>
     }
 }
 
-impl<'a> DecomposingNormalizer<'a>
-{
+impl<'a> DecomposingNormalizer<'a> {
     /// NFD-нормализатор
-    pub fn nfd() -> Self
-    {
+    pub fn nfd() -> Self {
         Self::from(data::nfd())
     }
 
     /// NFKD-нормализатор
-    pub fn nfkd() -> Self
-    {
+    pub fn nfkd() -> Self {
         Self::from(data::nfkd())
     }
 
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
     #[inline(never)]
-    pub fn normalize(&self, input: &str) -> String
-    {
+    pub fn normalize(&self, input: &str) -> String {
         let mut result = String::with_capacity(input.len());
         let mut buffer: Vec<Codepoint> = Vec::with_capacity(18);
 
@@ -62,12 +55,12 @@ impl<'a> DecomposingNormalizer<'a>
 
             match self.decompose(code) {
                 DecompositionValue::None => {
-                    flush!(result, buffer);
+                    flush_buffer(&mut result, &mut buffer);
                     write!(result, code);
                 }
                 DecompositionValue::Nonstarter(ccc) => buffer.push(Codepoint { code, ccc }),
                 DecompositionValue::Pair(c1, c2) => {
-                    flush!(result, buffer);
+                    flush_buffer(&mut result, &mut buffer);
                     write!(result, c1);
 
                     match c2.ccc == 0 {
@@ -76,7 +69,7 @@ impl<'a> DecomposingNormalizer<'a>
                     }
                 }
                 DecompositionValue::Triple(c1, c2, c3) => {
-                    flush!(result, buffer);
+                    flush_buffer(&mut result, &mut buffer);
                     write!(result, c1);
 
                     if c3.ccc == 0 {
@@ -90,63 +83,51 @@ impl<'a> DecomposingNormalizer<'a>
                     }
                 }
                 DecompositionValue::Singleton(c1) => {
-                    flush!(result, buffer);
+                    flush_buffer(&mut result, &mut buffer);
                     write!(result, c1);
-                }
-                DecompositionValue::HangulPair(c1, c2) => {
-                    flush!(result, buffer);
-                    write!(result, c1, c2);
-                }
-                DecompositionValue::HangulTriple(c1, c2, c3) => {
-                    flush!(result, buffer);
-                    write!(result, c1, c2, c3);
                 }
                 DecompositionValue::Expansion(index, count) => {
                     for entry in
-                        &self.expansions[(index as usize) .. (index as usize + count as usize)]
+                        &self.expansions[(index as usize)..(index as usize + count as usize)]
                     {
                         let ccc = c32_ccc!(entry);
                         let code = c32_code!(entry);
 
                         match ccc == 0 {
                             true => {
-                                flush!(result, buffer);
+                                flush_buffer(&mut result, &mut buffer);
                                 write!(result, code);
                             }
                             false => buffer.push(Codepoint { code, ccc }),
                         }
                     }
                 }
+                DecompositionValue::Hangul => {
+                    flush_buffer(&mut result, &mut buffer);
+                    decompose_hangul(&mut result, code);
+                }
             }
         }
 
-        flush!(result, buffer);
+        flush_buffer(&mut result, &mut buffer);
 
         result
     }
 
     /// получить декомпозицию символа
     #[inline(always)]
-    fn decompose(&self, code: u32) -> DecompositionValue
-    {
+    fn decompose(&self, code: u32) -> DecompositionValue {
         // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
         if code > LAST_DECOMPOSING_CODEPOINT {
             return DecompositionValue::None;
         };
 
-        let lvt = code.wrapping_sub(HANGUL_S_BASE);
-
-        if lvt > HANGUL_S_COUNT {
-            return parse_data_value(self.get_decomposition_value(code));
-        };
-
-        decompose_hangul(lvt)
+        parse_data_value(self.get_decomposition_value(code))
     }
 
     /// данные о декомпозиции символа
     #[inline(always)]
-    fn get_decomposition_value(&self, code: u32) -> u64
-    {
+    fn get_decomposition_value(&self, code: u32) -> u64 {
         match code <= self.continuous_block_end {
             true => self.data[code as usize],
             false => {
@@ -162,4 +143,20 @@ impl<'a> DecomposingNormalizer<'a>
             }
         }
     }
+}
+
+/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
+#[inline(always)]
+fn flush_buffer(result: &mut String, buffer: &mut Vec<Codepoint>) {
+    if !buffer.is_empty() {
+        if buffer.len() > 1 {
+            buffer.sort_by_key(|c| c.ccc);
+        }
+
+        for codepoint in buffer.iter() {
+            write!(result, codepoint.code);
+        }
+
+        buffer.clear();
+    };
 }

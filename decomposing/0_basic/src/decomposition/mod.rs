@@ -15,9 +15,10 @@ const MARKER_PAIR: u8 = 2;
 const MARKER_SINGLETON: u8 = 3;
 /// декомпозиция, вынесенная во внешний блок
 const MARKER_EXPANSION: u8 = 4;
+/// слог хангыль
+const MARKER_HANGUL: u8 = 5;
 
-pub enum DecompositionValue
-{
+pub enum DecompositionValue {
     /// стартер, декомпозиция отсутствует
     None,
     /// нестартер (например, диакретический знак)
@@ -30,15 +31,12 @@ pub enum DecompositionValue
     Singleton(u32),
     /// декомпозиция на несколько символов, в параметрах - индекс первого элемента в дополнительной таблице и количество этих элементов
     Expansion(u16, u8),
-    /// декомпозиция слога хангыль на 2 чамо. отличие от обычной пары в том, что все символы декомпозиции - стартеры
-    HangulPair(u32, u32),
-    /// декомпозиция слога хангыль на 3 чамо, все элементы декомпозиции - стартеры
-    HangulTriple(u32, u32, u32),
+    /// слог хангыль
+    Hangul,
 }
 
 /// кодпоинт для декомпозиции
-pub struct Codepoint
-{
+pub struct Codepoint {
     /// класс комбинирования
     pub ccc: u8,
     /// код символа
@@ -47,36 +45,33 @@ pub struct Codepoint
 
 /// парсим значение из таблицы
 #[inline(always)]
-pub fn parse_data_value(value: u64) -> DecompositionValue
-{
+pub fn parse_data_value(value: u64) -> DecompositionValue {
     match value as u8 {
         MARKER_STARTER => DecompositionValue::None,
         MARKER_NONSTARTER => parse_nonstarter(value),
         MARKER_PAIR => parse_pair_16bit(value),
         MARKER_SINGLETON => parse_singleton(value),
         MARKER_EXPANSION => parse_expansion(value),
+        MARKER_HANGUL => DecompositionValue::Hangul,
         _ => parse_triple_16bit(value),
     }
 }
 
 /// нестартер без декомпозиции
 #[inline(always)]
-fn parse_nonstarter(value: u64) -> DecompositionValue
-{
+fn parse_nonstarter(value: u64) -> DecompositionValue {
     DecompositionValue::Nonstarter(o!(value, u8, 1))
 }
 
 /// синглтон
 #[inline(always)]
-fn parse_singleton(value: u64) -> DecompositionValue
-{
+fn parse_singleton(value: u64) -> DecompositionValue {
     DecompositionValue::Singleton(o!(value, u32, 1))
 }
 
 /// 16-битная пара
 #[inline(always)]
-fn parse_pair_16bit(value: u64) -> DecompositionValue
-{
+fn parse_pair_16bit(value: u64) -> DecompositionValue {
     DecompositionValue::Pair(
         o!(value, u16, 1) as u32,
         Codepoint {
@@ -88,8 +83,7 @@ fn parse_pair_16bit(value: u64) -> DecompositionValue
 
 /// 16-битная тройка
 #[inline(always)]
-fn parse_triple_16bit(value: u64) -> DecompositionValue
-{
+fn parse_triple_16bit(value: u64) -> DecompositionValue {
     DecompositionValue::Triple(
         o!(value, u16) as u32,
         Codepoint {
@@ -105,7 +99,6 @@ fn parse_triple_16bit(value: u64) -> DecompositionValue
 
 /// декомпозиция, вынесенная во внешний блок
 #[inline(always)]
-fn parse_expansion(value: u64) -> DecompositionValue
-{
+fn parse_expansion(value: u64) -> DecompositionValue {
     DecompositionValue::Expansion(o!(value, u16, 1), o!(value, u8, 1))
 }
