@@ -1,4 +1,4 @@
-use unicode_normalization_source::{NormalizationTest, NORMALIZATION_TESTS};
+use unicode_data::{NormalizationTest, NORMALIZATION_TESTS};
 
 use unicode_decomposing::DecomposingNormalizer as optimized;
 use unicode_decomposing_basic::DecomposingNormalizer as basic;

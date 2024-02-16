@@ -1,4 +1,4 @@
-use unicode_normalization_source::{properties::*, UNICODE};
+use unicode_data::{codepoint::*, UNICODE};
 
 use crate::output::stats::CodepointGroups;
 

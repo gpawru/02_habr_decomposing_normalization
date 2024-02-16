@@ -1,4 +1,4 @@
-use unicode_normalization_source::UNICODE;
+use unicode_data::UNICODE;
 
 use crate::encode::{encode_codepoint, MARKER_HANGUL};
 use crate::output::stats::CodepointGroups;
@@ -88,7 +88,7 @@ pub fn prepare<'a>(canonical: bool) -> (Vec<u32>, Vec<u64>, Vec<u32>, CodepointG
         assert_eq!(index[block], 0);
         index[block] = block_for!(data.len()) as u32;
     }
-    
+
     data.extend([MARKER_HANGUL; 1 << BLOCK_BITS as usize]);
 
     index[block_for!(0xD7A3)] = block_for!(data.len()) as u32;

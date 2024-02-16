@@ -5,4 +5,4 @@ edition = "2021"
 publish = false
 
 [dependencies]
-unicode_normalization_source = { path = "./../source" }
+unicode_data = { git = "https://github.com/gpawru/unicode_data.git" }
