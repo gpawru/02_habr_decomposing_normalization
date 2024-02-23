@@ -1,4 +1,4 @@
-use crate::write;
+use crate::codepoint::Codepoint;
 
 /// начало блока слогов хангыль
 pub const HANGUL_S_BASE: u32 = 0xAC00;
@@ -17,7 +17,8 @@ pub const HANGUL_N_COUNT: u32 = 588;
 
 /// декомпозция хангыль
 #[inline(always)]
-pub fn decompose_hangul(result: &mut String, code: u32) {
+pub fn decompose_hangul_syllable(result: &mut String, code: u32)
+{
     let lvt = code - HANGUL_S_BASE;
 
     let l = lvt / HANGUL_N_COUNT;
@@ -28,7 +29,16 @@ pub fn decompose_hangul(result: &mut String, code: u32) {
     let c1 = HANGUL_V_BASE + v;
 
     match t == 0 {
-        true => write!(result, c0, c1),
-        false => write!(result, c0, c1, HANGUL_T_BASE + t),
+        true => {
+            result.push(char::from(Codepoint::from(c0)));
+            result.push(char::from(Codepoint::from(c1)));
+        }
+        false => {
+            let c2 = HANGUL_T_BASE + t;
+
+            result.push(char::from(Codepoint::from(c0)));
+            result.push(char::from(Codepoint::from(c1)));
+            result.push(char::from(Codepoint::from(c2)));
+        }
     }
 }

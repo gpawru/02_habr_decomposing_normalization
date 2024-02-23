@@ -32,9 +32,9 @@ pub fn encode_codepoint(
         starter,
         nonstarter,
         singleton,
-        pair16,
+        pair,
         triple16,
-        pair18,
+        // pair18,
         starter_to_nonstarters,
         nonstarter_decomposition,
         triple18,
@@ -52,7 +52,7 @@ pub fn encode_codepoint(
 
             let dec_string: String = decomposition
                 .iter()
-                .map(|c| format!("U+{:04X} [{}] ", *c, u8::from(get_ccc(*c))))
+                .map(|c| format!("U+{:04X} [{}] ", *c, get_ccc(*c).compressed()))
                 .collect();
 
             panic!(
@@ -76,7 +76,7 @@ fn starter(
     _: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter() || !decomposition.is_empty() {
+    if !codepoint.is_starter() || !decomposition.is_empty() {
         return None;
     }
 
@@ -95,13 +95,14 @@ fn nonstarter(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_nonstarter() || !decomposition.is_empty() {
+    if !codepoint.is_nonstarter() || !decomposition.is_empty() {
         return None;
     }
 
-    let ccc = u64::from(codepoint.ccc);
+    let code = codepoint.code as u64;
+    let ccc = codepoint.ccc.compressed() as u64;
 
-    let value = MARKER_NONSTARTER | (ccc << 8);
+    let value = MARKER_NONSTARTER | (ccc << 8) | (code << 16);
 
     to_stats(stats, "1. нестартеры", codepoint, decomposition);
     Some((value, vec![]))
@@ -117,7 +118,7 @@ fn singleton(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.len() != 1
         || !get_ccc(decomposition[0]).is_starter()
     {
@@ -126,27 +127,26 @@ fn singleton(
 
     let code = decomposition[0] as u64;
 
-    let value = MARKER_SINGLETON | (code << 32);
+    let value = MARKER_SINGLETON | (code << 16);
 
     to_stats(stats, "2. синглтоны", codepoint, decomposition);
     Some((value, vec![]))
 }
 
-/// пара (16 бит):
+/// пара:
 ///     - стартер
 ///     - декомпозиция из 2х кодпоинтов
-///     - кодпоинты декомпозиции - 16-битные
 ///     - первый из них - стартер
-fn pair16(
+fn pair(
     codepoint: &Codepoint,
     decomposition: &Vec<u32>,
     _: usize,
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.len() != 2
-        || decomposition.iter().any(|&c| c > 0xFFFF)
+        // || decomposition.iter().any(|&c| c > 0xFFFF)
         || !get_ccc(decomposition[0]).is_starter()
     {
         return None;
@@ -154,11 +154,11 @@ fn pair16(
 
     let c1 = decomposition[0] as u64;
     let c2 = decomposition[1] as u64;
-    let c2_ccc = u64::from(get_ccc(decomposition[1]));
+    let c2_ccc = get_ccc(decomposition[1]).compressed() as u64;
 
-    let value = MARKER_PAIR | (c2_ccc << 8) | (c1 << 16) | (c2 << 32);
+    let value = MARKER_PAIR | (c1 << 8) | (c2_ccc << 32) | (c2 << 40);
 
-    to_stats(stats, "3. пары (16 бит)", codepoint, decomposition);
+    to_stats(stats, "3. пары", codepoint, decomposition);
     Some((value, vec![]))
 }
 
@@ -174,7 +174,7 @@ fn triple16(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.len() != 3
         || decomposition.iter().any(|&c| c > 0xFFFF)
         || !get_ccc(decomposition[0]).is_starter()
@@ -186,42 +186,42 @@ fn triple16(
     let c2 = decomposition[1] as u64;
     let c3 = decomposition[2] as u64;
 
-    let c2_ccc = u64::from(get_ccc(decomposition[1]));
-    let c3_ccc = u64::from(get_ccc(decomposition[2]));
+    let c2_ccc = get_ccc(decomposition[1]).compressed() as u64;
+    let c3_ccc = get_ccc(decomposition[2]).compressed() as u64;
 
-    let value = c1 | (c2 << 16) | (c3 << 32) | (c2_ccc << 48) | (c3_ccc << 56);
+    let value = c1 | (c2_ccc << 16) | (c2 << 24) | (c3_ccc << 40) | (c3 << 48);
 
     to_stats(stats, "4. тройки (16 бит)", codepoint, decomposition);
     Some((value, vec![]))
 }
 
-/// пара (18 бит):
-///     - стартер
-///     - декомпозиция из 2х кодпоинтов
-///     - хотя бы один из кодпоинтов декомпозиции - 18-битный
-///     - первый из них - стартер
-fn pair18(
-    codepoint: &Codepoint,
-    decomposition: &Vec<u32>,
-    expansion_position: usize,
-    stats: &mut CodepointGroups,
-) -> Option<(u64, Vec<u32>)>
-{
-    if !codepoint.ccc.is_starter()
-        || decomposition.len() != 2
-        || decomposition.iter().all(|&c| c <= 0xFFFF)
-        || !get_ccc(decomposition[0]).is_starter()
-    {
-        return None;
-    }
+// /// пара (18 бит):
+// ///     - стартер
+// ///     - декомпозиция из 2х кодпоинтов
+// ///     - хотя бы один из кодпоинтов декомпозиции - 18-битный
+// ///     - первый из них - стартер
+// fn pair18(
+//     codepoint: &Codepoint,
+//     decomposition: &Vec<u32>,
+//     expansion_position: usize,
+//     stats: &mut CodepointGroups,
+// ) -> Option<(u64, Vec<u32>)>
+// {
+//     if !codepoint.is_starter()
+//         || decomposition.len() != 2
+//         || decomposition.iter().all(|&c| c <= 0xFFFF)
+//         || !get_ccc(decomposition[0]).is_starter()
+//     {
+//         return None;
+//     }
 
-    let value = MARKER_EXPANSION
-        | ((decomposition.len() as u64) << 8)
-        | ((expansion_position as u64) << 16);
+//     let value = MARKER_EXPANSION
+//         | ((decomposition.len() as u64) << 8)
+//         | ((expansion_position as u64) << 16);
 
-    to_stats(stats, "5. пары (18 бит)", codepoint, decomposition);
-    Some((value, map_expansion(decomposition)))
-}
+//     to_stats(stats, "5. пары (18 бит)", codepoint, decomposition);
+//     Some((value, map_expansion(decomposition)))
+// }
 
 /// стартер с декомпозицией в нестартеры
 ///     - стартер
@@ -233,7 +233,7 @@ fn starter_to_nonstarters(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.is_empty()
         || !decomposition.iter().all(|&c| get_ccc(c).is_nonstarter())
     {
@@ -258,7 +258,7 @@ fn nonstarter_decomposition(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_nonstarter() || decomposition.is_empty() {
+    if !codepoint.is_nonstarter() || decomposition.is_empty() {
         return None;
     }
 
@@ -287,7 +287,7 @@ fn triple18(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.len() != 3
         || decomposition.iter().all(|&c| c <= 0xFFFF)
         || !get_ccc(decomposition[0]).is_starter()
@@ -314,7 +314,7 @@ fn long_decomposition(
     stats: &mut CodepointGroups,
 ) -> Option<(u64, Vec<u32>)>
 {
-    if !codepoint.ccc.is_starter()
+    if !codepoint.is_starter()
         || decomposition.len() <= 3
         || !get_ccc(decomposition[0]).is_starter()
     {
@@ -345,7 +345,7 @@ fn map_expansion(decomposition: &[u32]) -> Vec<u32>
 {
     decomposition
         .iter()
-        .map(|e| e | u32::from(get_ccc(*e)) << 24)
+        .map(|e| (*e << 8) | get_ccc(*e).compressed() as u32)
         .collect()
 }
 

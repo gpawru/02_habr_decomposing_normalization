@@ -1,11 +1,15 @@
+use core::str::from_utf8_unchecked;
+
+use codepoint::Codepoint;
 use decomposition::hangul::decompose_hangul_syllable;
 use decomposition::*;
 use slice::aligned::Aligned;
 use slice::iter::CharsIter;
 
+mod codepoint;
 mod data;
 mod decomposition;
-mod macros;
+
 mod slice;
 mod utf8;
 
@@ -63,7 +67,8 @@ macro_rules! normalizer_methods {
             Some(loop {
                 if iter.is_empty() {
                     flush_buffer(result, buffer);
-                    write_str!(result, iter.ending_slice());
+
+                    result.push_str(unsafe { from_utf8_unchecked(iter.ending_slice()) });
 
                     return None;
                 }
@@ -95,7 +100,7 @@ macro_rules! normalizer_methods {
 
                     if !iter.at_breakpoint(width) {
                         flush_buffer(result, buffer);
-                        write_str!(result, iter.block_slice(width));
+                        result.push_str(unsafe { from_utf8_unchecked(iter.block_slice(width)) });
                     }
 
                     break (data_value, code);
@@ -179,16 +184,16 @@ impl<'a> DecomposingNormalizer<'a>
 }
 
 /// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
-#[inline(always)]
+#[inline(never)]
 fn flush_buffer(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
     if !buffer.is_empty() {
         if buffer.len() > 1 {
-            buffer.sort_by_key(|c| c.ccc);
+            buffer.sort_by_key(|codepoint| codepoint.ccc());
         }
 
         for codepoint in buffer.iter() {
-            write!(result, codepoint.code);
+            result.push(char::from(*codepoint));
         }
 
         buffer.clear();
@@ -209,25 +214,26 @@ fn handle_decomposition_value(
     let decomposition = parse_data_value(data_value);
 
     match decomposition {
-        DecompositionValue::Nonstarter(ccc) => buffer.push(Codepoint { code, ccc }),
-        DecompositionValue::Pair(c1, c2) => {
+        DecompositionValue::Nonstarter(c1) => buffer.push(c1),
+        DecompositionValue::Pair((c1, c2)) => {
             flush_buffer(result, buffer);
-            write!(result, c1);
+            result.push(char::from(c1));
 
-            match c2.ccc == 0 {
-                true => write!(result, c2.code),
+            match c2.is_starter() {
+                true => result.push(char::from(c2)),
                 false => buffer.push(c2),
             }
         }
         DecompositionValue::Triple(c1, c2, c3) => {
             flush_buffer(result, buffer);
-            write!(result, c1);
+            result.push(char::from(c1));
 
-            if c3.ccc == 0 {
-                write!(result, c2.code, c3.code);
+            if c3.is_starter() {
+                result.push(char::from(c2));
+                result.push(char::from(c3));
             } else {
-                match c2.ccc == 0 {
-                    true => write!(result, c2.code),
+                match c2.is_starter() {
+                    true => result.push(char::from(c2)),
                     false => buffer.push(c2),
                 }
                 buffer.push(c3);
@@ -235,19 +241,18 @@ fn handle_decomposition_value(
         }
         DecompositionValue::Singleton(c1) => {
             flush_buffer(result, buffer);
-            write!(result, c1);
+            result.push(char::from(c1));
         }
         DecompositionValue::Expansion(index, count) => {
             for entry in &expansions[(index as usize) .. (index as usize + count as usize)] {
-                let ccc = c32_ccc!(entry);
-                let code = c32_code!(entry);
+                let codepoint = Codepoint::from(*entry);
 
-                match ccc == 0 {
+                match codepoint.is_starter() {
                     true => {
                         flush_buffer(result, buffer);
-                        write!(result, code);
+                        result.push(char::from(codepoint));
                     }
-                    false => buffer.push(Codepoint { code, ccc }),
+                    false => buffer.push(codepoint),
                 }
             }
         }
