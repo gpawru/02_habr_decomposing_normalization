@@ -1,6 +1,6 @@
 use unicode_data::{NormalizationTest, NORMALIZATION_TESTS};
-use unicode_decomposing::{nfd_normalizer, nfkd_normalizer};
-use unicode_decomposing_basic::DecomposingNormalizer as basic;
+use unicode_decomposing::DecomposingNormalizer as optimized;
+// use unicode_decomposing_basic::DecomposingNormalizer as basic;
 
 macro_rules! test {
     ($left: expr, $right: expr, $normalizer: expr, $test: expr, $str: expr) => {
@@ -39,7 +39,7 @@ fn ucd_test_nfd()
         };
     }
 
-    test_group!(/*basic::nfd(),*/ nfd_normalizer());
+    test_group!(/*basic::nfd(),*/ optimized::nfd());
 }
 
 /// тесты NFKD нормализации из UCD
@@ -66,5 +66,5 @@ fn ucd_test_nfkd()
         };
     }
 
-    test_group!(/*basic::nfkd(),*/ nfkd_normalizer());
+    test_group!(/*basic::nfkd(),*/ optimized::nfkd());
 }
