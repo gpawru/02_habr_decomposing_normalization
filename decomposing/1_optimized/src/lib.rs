@@ -41,13 +41,13 @@ pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
 }
 
 /// NFD-нормализатор
-pub fn nfd_normalizer() -> DecomposingNormalizer
+pub fn new_nfd() -> DecomposingNormalizer
 {
     from_baked(data::nfd())
 }
 
 /// NFKD-нормализатор
-pub fn nfkd_normalizer() -> DecomposingNormalizer
+pub fn new_nfkd() -> DecomposingNormalizer
 {
     from_baked(data::nfkd())
 }

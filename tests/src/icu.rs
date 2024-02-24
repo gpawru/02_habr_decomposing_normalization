@@ -35,12 +35,9 @@ fn icu()
         };
     }
 
-    test!(
-        /*(basic::nfd(), basic::nfkd(), "basic"),*/
-        (
-            optimized::nfd_normalizer(),
-            optimized::nfkd_normalizer(),
-            "optimized"
-        )
-    );
+    test!(/*(basic::nfd(), basic::nfkd(), "basic"),*/ (
+        optimized::new_nfd(),
+        optimized::new_nfkd(),
+        "optimized"
+    ));
 }
