@@ -1,9 +1,9 @@
 use core::str::from_utf8_unchecked;
 
 /// начало блока слогов хангыль
-pub const HANGUL_S_BASE: u32 = 0xAC00;
+const HANGUL_S_BASE: u32 = 0xAC00;
 /// количество гласных * количество завершающих согласных
-pub const HANGUL_N_COUNT: u32 = 588;
+const HANGUL_N_COUNT: u32 = 588;
 /// количество завершающих согласных
 const HANGUL_T_COUNT: u32 = 27;
 /// количество кодпоинтов на блок LV
@@ -34,3 +34,4 @@ pub fn decompose_hangul_syllable(result: &mut String, code: u32)
         }
     };
 }
+

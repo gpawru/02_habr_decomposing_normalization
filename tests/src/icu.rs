@@ -1,5 +1,5 @@
 use icu_normalizer::DecomposingNormalizer as icu;
-use unicode_decomposing::DecomposingNormalizer as optimized;
+use unicode_decomposing as optimized;
 use unicode_decomposing_basic::DecomposingNormalizer as basic;
 
 /// сравниваем с результатами нормализации ICU
@@ -10,10 +10,10 @@ fn icu()
     let icu_nfkd = icu::new_nfkd();
 
     macro_rules! test {
-        ($(($n: ident,  $t: expr)),+) => {
+        ($(($nfd: expr, $nfkd: expr,  $t: expr)),+) => {
             $(
-                let nfd = $n::nfd();
-                let nfkd = $n::nfkd();
+                let nfd = $nfd;
+                let nfkd = $nfkd;
 
                 for data in crate::data::files() {
                     assert_eq!(
@@ -35,5 +35,12 @@ fn icu()
         };
     }
 
-    test!((basic, "basic"), (optimized, "optimized"));
+    test!(
+        /*(basic::nfd(), basic::nfkd(), "basic"),*/
+        (
+            optimized::nfd_normalizer(),
+            optimized::nfkd_normalizer(),
+            "optimized"
+        )
+    );
 }

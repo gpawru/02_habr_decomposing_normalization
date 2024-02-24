@@ -3,11 +3,11 @@ pub const MEASUREMENT_TIME: u64 = 7;
 
 #[macro_export]
 macro_rules! group {
-    ($dir: expr, $fn: ident, $test: ident, $group: expr,  $name:expr,  $normalizer: expr) => {
+    ($dir: expr, $fn: ident, $test: ident, $group: expr,  $name:expr,  $normalizer: expr, $tt:ty) => {
         #[inline(never)]
-        fn $test(normalizer: &DecomposingNormalizer, source: &str) -> String
+        fn $test(normalizer: &$tt, source: &str)
         {
-            normalizer.normalize(source)
+            normalizer.normalize(source);
         }
 
         fn $fn(c: &mut Criterion)

@@ -9,7 +9,8 @@ group!(
     test_nfd,
     "nfd",
     "my",
-    DecomposingNormalizer::nfd()
+    DecomposingNormalizer::nfd(),
+    DecomposingNormalizer
 );
 
 group!(
@@ -18,7 +19,8 @@ group!(
     test_nfkd,
     "nfkd",
     "my",
-    DecomposingNormalizer::nfkd()
+    DecomposingNormalizer::nfkd(),
+    DecomposingNormalizer
 );
 
 group!(
@@ -27,7 +29,8 @@ group!(
     test_dec,
     "dec",
     "my",
-    DecomposingNormalizer::nfd()
+    DecomposingNormalizer::nfd(),
+    DecomposingNormalizer
 );
 
 criterion_group!(benches, nfd, nfkd, dec);
