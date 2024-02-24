@@ -1,4 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use unicode_decomposing::nfd_normalizer;
+use unicode_decomposing::nfkd_normalizer;
 use unicode_decomposing::DecomposingNormalizer;
 
 mod group;
@@ -9,7 +11,7 @@ group!(
     test_nfd,
     "nfd",
     "my",
-    DecomposingNormalizer::nfd(),
+    nfd_normalizer(),
     DecomposingNormalizer
 );
 
@@ -19,7 +21,7 @@ group!(
     test_nfkd,
     "nfkd",
     "my",
-    DecomposingNormalizer::nfkd(),
+    nfkd_normalizer(),
     DecomposingNormalizer
 );
 
@@ -29,7 +31,7 @@ group!(
     test_dec,
     "dec",
     "my",
-    DecomposingNormalizer::nfd(),
+    nfd_normalizer(),
     DecomposingNormalizer
 );
 

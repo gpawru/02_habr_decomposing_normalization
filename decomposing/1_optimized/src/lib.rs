@@ -28,6 +28,29 @@ pub struct DecomposingNormalizer
     continuous_block_end: u32,
     _p1: [u32; 3],
 }
+/// заранее подготовленные данные
+pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
+{
+    DecomposingNormalizer {
+        data: Aligned::from(source.data),
+        index: Aligned::from(source.index),
+        expansions: Aligned::from(source.expansions),
+        continuous_block_end: source.continuous_block_end,
+        _p1: [0; 3],
+    }
+}
+
+/// NFD-нормализатор
+pub fn nfd_normalizer() -> DecomposingNormalizer
+{
+    from_baked(data::nfd())
+}
+
+/// NFKD-нормализатор
+pub fn nfkd_normalizer() -> DecomposingNormalizer
+{
+    from_baked(data::nfkd())
+}
 
 impl DecomposingNormalizer
 {
@@ -190,30 +213,6 @@ impl DecomposingNormalizer
 
                 self.data[index]
             }
-        }
-    }
-
-    /// NFD-нормализатор
-    pub fn nfd() -> DecomposingNormalizer
-    {
-        Self::from_baked(data::nfd())
-    }
-
-    /// NFKD-нормализатор
-    pub fn nfkd() -> DecomposingNormalizer
-    {
-        Self::from_baked(data::nfkd())
-    }
-
-    /// заранее подготовленные данные
-    pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
-    {
-        DecomposingNormalizer {
-            data: Aligned::from(source.data),
-            index: Aligned::from(source.index),
-            expansions: Aligned::from(source.expansions),
-            continuous_block_end: source.continuous_block_end,
-            _p1: [0; 3],
         }
     }
 }
