@@ -1,5 +1,3 @@
-use crate::codepoint::Codepoint;
-
 /// начало блока слогов хангыль
 pub const HANGUL_S_BASE: u32 = 0xAC00;
 /// начало блока ведущих согласных чамо
@@ -28,17 +26,19 @@ pub fn decompose_hangul_syllable(result: &mut String, code: u32)
     let c0 = HANGUL_L_BASE + l;
     let c1 = HANGUL_V_BASE + v;
 
+    macro_rules! write_chars {
+        ($($char: expr),+) => {
+            $(result.push(unsafe { char::from_u32_unchecked($char) });)+
+        };
+    }
+
     match t == 0 {
         true => {
-            result.push(char::from(Codepoint::from(c0)));
-            result.push(char::from(Codepoint::from(c1)));
+            write_chars!(c0, c1);
         }
         false => {
             let c2 = HANGUL_T_BASE + t;
-
-            result.push(char::from(Codepoint::from(c0)));
-            result.push(char::from(Codepoint::from(c1)));
-            result.push(char::from(Codepoint::from(c2)));
+            write_chars!(c0, c1, c2);
         }
     }
 }

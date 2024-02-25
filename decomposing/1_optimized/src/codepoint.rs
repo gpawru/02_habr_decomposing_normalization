@@ -2,24 +2,6 @@
 #[derive(Debug, Clone, Copy)]
 pub struct Codepoint(u32);
 
-impl From<u32> for Codepoint
-{
-    #[inline(always)]
-    fn from(value: u32) -> Self
-    {
-        Self(value)
-    }
-}
-
-impl From<Codepoint> for u32
-{
-    #[inline(always)]
-    fn from(value: Codepoint) -> Self
-    {
-        value.0
-    }
-}
-
 impl From<Codepoint> for char
 {
     #[inline(always)]
@@ -53,6 +35,12 @@ impl Codepoint
     pub fn is_nonstarter(&self) -> bool
     {
         self.0 as u8 != 0
+    }
+
+    #[inline(always)]
+    pub fn from_baked(code: u32) -> Self
+    {
+        Self(code)
     }
 
     #[inline(always)]

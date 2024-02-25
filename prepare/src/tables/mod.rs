@@ -27,6 +27,62 @@ macro_rules! block_for {
     };
 }
 
+#[test]
+fn test_blocks()
+{
+    let (index, data, ext, stats) = prepare(true);
+
+    let max_block = *index.iter().max().unwrap();
+
+    for i in 0 ..= max_block {
+        let mut findex: Vec<usize> = vec![];
+
+        index.iter().enumerate().for_each(|(j, &e)| {
+            if e == i {
+                findex.push(j);
+            }
+        });
+
+        if findex.len() != 1 {
+            continue;
+        }
+
+        println!("данные #{:04X}", i);
+        print!("индексы: ");
+        findex.iter().for_each(|j| print!("{:04X} ", j));
+        println!("\n");
+
+        let block = findex[0];
+
+        for code in code_for!(block, 0) .. code_for!(block + 1, 0) {
+            let codepoint = UNICODE.get(&(code as u32));
+
+            let block_offset = (i as usize) << 7;
+            let code_offset = ((code as u8) & 0x7F) as usize;
+
+            let value = data[block_offset | code_offset];
+
+            if value == 0 {
+                continue;
+            }
+
+            match codepoint {
+                Some(codepoint) => {
+                    let block_name = match codepoint.block {
+                        Some(codepoint_block) => codepoint_block.name.clone(),
+                        None => "".to_owned(),
+                    };
+
+                    println!("U+{:04X} - {} - {}", code, codepoint.name, block_name);
+                }
+                None => (),
+            }
+        }
+
+        println!()
+    }
+}
+
 /// подготавливаем таблицы NFD, NFKD
 pub fn prepare<'a>(canonical: bool) -> (Vec<u32>, Vec<u64>, Vec<u32>, CodepointGroups<'a>)
 {

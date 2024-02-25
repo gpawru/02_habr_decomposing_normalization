@@ -171,9 +171,9 @@ impl DecomposingNormalizer
                 write(result, c1);
             }
             DecompositionValue::Expansion(index, count) => {
-                for entry in &self.expansions[(index as usize) .. (index as usize + count as usize)]
+                for &entry in &self.expansions[(index as usize) .. (index as usize + count as usize)]
                 {
-                    let codepoint = Codepoint::from(*entry);
+                    let codepoint = Codepoint::from_baked(entry);
 
                     match codepoint.is_starter() {
                         true => {
@@ -240,8 +240,8 @@ fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
             buffer.sort_by_key(|codepoint| codepoint.ccc());
         }
 
-        for codepoint in buffer.iter() {
-            write(result, *codepoint);
+        for &codepoint in buffer.iter() {
+            write(result, codepoint);
         }
 
         buffer.clear();

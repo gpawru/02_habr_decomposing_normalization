@@ -2,30 +2,12 @@
 #[derive(Debug, Clone, Copy)]
 pub struct Codepoint(u32);
 
-impl From<u32> for Codepoint
-{
-    #[inline]
-    fn from(value: u32) -> Self
-    {
-        Self(value)
-    }
-}
-
-impl From<Codepoint> for u32
-{
-    #[inline]
-    fn from(value: Codepoint) -> Self
-    {
-        value.0
-    }
-}
-
 impl From<Codepoint> for char
 {
-    #[inline]
+    #[inline(always)]
     fn from(value: Codepoint) -> Self
     {
-        unsafe { char::from_u32_unchecked(value.code()) }
+        unsafe { char::from_u32_unchecked(value.0 >> 8) }
     }
 }
 
@@ -56,8 +38,20 @@ impl Codepoint
     }
 
     #[inline(always)]
-    pub fn compose(code: u32, ccc: u8) -> Self
+    pub fn from_baked(code: u32) -> Self
+    {
+        Self(code)
+    }
+
+    #[inline(always)]
+    pub fn from_code_and_ccc(code: u32, ccc: u8) -> Self
     {
         Self(code << 8 | (ccc as u32))
+    }
+
+    #[inline(always)]
+    pub fn from_code(code: u32) -> Self
+    {
+        Self(code << 8)
     }
 }

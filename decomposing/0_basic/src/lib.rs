@@ -20,33 +20,31 @@ pub struct DecomposingNormalizer<'a>
     continuous_block_end: u32,
 }
 
-impl<'a> From<data::DecompositionData<'a>> for DecomposingNormalizer<'a>
+/// заранее подготовленные данные
+pub fn from_baked<'a>(source: data::DecompositionData<'a>) -> DecomposingNormalizer<'a>
 {
-    fn from(source: data::DecompositionData<'a>) -> Self
-    {
-        Self {
-            index: source.index,
-            data: source.data,
-            expansions: source.expansions,
-            continuous_block_end: source.continuous_block_end,
-        }
+    DecomposingNormalizer {
+        index: source.index,
+        data: source.data,
+        expansions: source.expansions,
+        continuous_block_end: source.continuous_block_end,
     }
+}
+
+/// NFD-нормализатор
+pub fn new_nfd<'a>() -> DecomposingNormalizer<'a>
+{
+    from_baked(data::nfd())
+}
+
+/// NFKD-нормализатор
+pub fn new_nfkd<'a>() -> DecomposingNormalizer<'a>
+{
+    from_baked(data::nfkd())
 }
 
 impl<'a> DecomposingNormalizer<'a>
 {
-    /// NFD-нормализатор
-    pub fn nfd() -> Self
-    {
-        Self::from(data::nfd())
-    }
-
-    /// NFKD-нормализатор
-    pub fn nfkd() -> Self
-    {
-        Self::from(data::nfkd())
-    }
-
     /// нормализация строки
     /// исходная строка должна являться well-formed UTF-8 строкой
     #[inline(never)]
@@ -63,61 +61,61 @@ impl<'a> DecomposingNormalizer<'a>
 
             match self.decompose(code) {
                 DecompositionValue::None => {
-                    flush_buffer(&mut result, &mut buffer);
-                    result.push(char::from(Codepoint::from(code)));
+                    flush(&mut result, &mut buffer);
+                    write(&mut result, Codepoint::from_code(code));
                 }
                 DecompositionValue::Nonstarter(c1) => buffer.push(c1),
                 DecompositionValue::Pair((c1, c2)) => {
-                    flush_buffer(&mut result, &mut buffer);
-                    result.push(char::from(c1));
+                    flush(&mut result, &mut buffer);
+                    write(&mut result, c1);
 
                     match c2.is_starter() {
-                        true => result.push(char::from(c2)),
+                        true => write(&mut result, c2),
                         false => buffer.push(c2),
                     }
                 }
                 DecompositionValue::Triple(c1, c2, c3) => {
-                    flush_buffer(&mut result, &mut buffer);
-                    result.push(char::from(c1));
+                    flush(&mut result, &mut buffer);
+                    write(&mut result, c1);
 
                     if c3.is_starter() {
-                        result.push(char::from(c2));
-                        result.push(char::from(c3));
+                        write(&mut result, c2);
+                        write(&mut result, c3);
                     } else {
                         match c2.is_starter() {
-                            true => result.push(char::from(c2)),
+                            true => write(&mut result, c2),
                             false => buffer.push(c2),
                         }
                         buffer.push(c3);
                     }
                 }
                 DecompositionValue::Singleton(c1) => {
-                    flush_buffer(&mut result, &mut buffer);
-                    result.push(char::from(c1));
+                    flush(&mut result, &mut buffer);
+                    write(&mut result, c1);
                 }
                 DecompositionValue::Expansion(index, count) => {
-                    for entry in
+                    for &entry in
                         &self.expansions[(index as usize) .. (index as usize + count as usize)]
                     {
-                        let codepoint = Codepoint::from(*entry);
+                        let codepoint = Codepoint::from_baked(entry);
 
                         match codepoint.is_starter() {
                             true => {
-                                flush_buffer(&mut result, &mut buffer);
-                                result.push(char::from(codepoint));
+                                flush(&mut result, &mut buffer);
+                                write(&mut result, codepoint);
                             }
                             false => buffer.push(codepoint),
                         }
                     }
                 }
                 DecompositionValue::Hangul => {
-                    flush_buffer(&mut result, &mut buffer);
+                    flush(&mut result, &mut buffer);
                     decompose_hangul_syllable(&mut result, code);
                 }
             }
         }
 
-        flush_buffer(&mut result, &mut buffer);
+        flush(&mut result, &mut buffer);
 
         result
     }
@@ -155,17 +153,24 @@ impl<'a> DecomposingNormalizer<'a>
     }
 }
 
+/// дописать кодпоинт в UTF-8 результат
+#[inline(always)]
+fn write(result: &mut String, codepoint: Codepoint)
+{
+    result.push(char::from(codepoint));
+}
+
 /// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
-#[inline(never)]
-fn flush_buffer(result: &mut String, buffer: &mut Vec<Codepoint>)
+#[inline(always)]
+fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
     if !buffer.is_empty() {
         if buffer.len() > 1 {
             buffer.sort_by_key(|codepoint| codepoint.ccc());
         }
 
-        for codepoint in buffer.iter() {
-            result.push(char::from(*codepoint));
+        for &codepoint in buffer.iter() {
+            write(result, codepoint);
         }
 
         buffer.clear();

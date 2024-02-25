@@ -5,7 +5,7 @@ edition = "2021"
 
 [dev-dependencies]
 criterion = "0.5.1"
-# icu_normalizer = "1.4.1"
+icu_normalizer = "1.4.1"
 
 unicode_decomposing = { path = "./../decomposing/1_optimized" }
 
@@ -19,10 +19,10 @@ harness = false
 # path = "benches/u32.rs"
 # harness = false
 
-# [[bench]]
-# name = "icu"
-# path = "benches/icu.rs"
-# harness = false
+[[bench]]
+name = "icu"
+path = "benches/icu.rs"
+harness = false
 
 [profile.bench]
 opt-level = 3

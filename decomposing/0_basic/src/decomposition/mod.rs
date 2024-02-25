@@ -55,14 +55,14 @@ pub fn parse_data_value(value: u64) -> DecompositionValue
 #[inline(always)]
 fn parse_nonstarter(value: u64) -> DecompositionValue
 {
-    DecompositionValue::Nonstarter(Codepoint::from((value >> 8) as u32))
+    DecompositionValue::Nonstarter(Codepoint::from_baked((value >> 8) as u32))
 }
 
 /// синглтон
 #[inline(always)]
 fn parse_singleton(value: u64) -> DecompositionValue
 {
-    DecompositionValue::Singleton(Codepoint::from((value >> 8) as u32))
+    DecompositionValue::Singleton(Codepoint::from_baked((value >> 8) as u32))
 }
 
 /// пара
@@ -77,9 +77,9 @@ fn parse_pair(value: u64) -> DecompositionValue
 fn parse_triple_16bit(value: u64) -> DecompositionValue
 {
     DecompositionValue::Triple(
-        Codepoint::from(((value as u16) as u32) << 8),
-        Codepoint::from(((value >> 8) as u32) >> 8),
-        Codepoint::from((value >> 40) as u32),
+        Codepoint::from_baked(((value as u16) as u32) << 8),
+        Codepoint::from_baked(((value >> 8) as u32) >> 8),
+        Codepoint::from_baked((value >> 40) as u32),
     )
 }
 
