@@ -19,11 +19,11 @@ mod utf8;
 pub struct DecomposingNormalizer
 {
     /// основные данные
-    data: Aligned<'static, u64>,
+    pub data: Aligned<'static, u64>,
     /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x7E, в NFKD - 0xA6
-    index: Aligned<'static, u8>,
+    pub index: Aligned<'static, u8>,
     /// данные кодпоинтов, которые не вписываются в основную часть
-    expansions: Aligned<'static, u32>,
+    pub expansions: Aligned<'static, u32>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
     _p1: [u32; 3],
@@ -171,7 +171,8 @@ impl DecomposingNormalizer
                 write(result, c1);
             }
             DecompositionValue::Expansion(index, count) => {
-                for &entry in &self.expansions[(index as usize) .. (index as usize + count as usize)]
+                for &entry in
+                    &self.expansions[(index as usize) .. (index as usize + count as usize)]
                 {
                     let codepoint = Codepoint::from_baked(entry);
 
