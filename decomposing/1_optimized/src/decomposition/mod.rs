@@ -9,10 +9,10 @@ pub const LAST_DECOMPOSING_CODEPOINT: u32 = 0x2FA1D;
 const MARKER_NONSTARTER: u8 = 1;
 /// 16-битная пара
 const MARKER_PAIR: u8 = 2;
-/// синглтон
-const MARKER_SINGLETON: u8 = 3;
 /// декомпозиция, вынесенная во внешний блок
-const MARKER_EXPANSION: u8 = 4;
+const MARKER_EXPANSION: u8 = 3;
+/// синглтон
+const MARKER_SINGLETON: u8 = 4;
 /// слог хангыль
 const MARKER_HANGUL: u8 = 5;
 
@@ -46,6 +46,16 @@ pub fn parse_data_value(value: u64) -> DecompositionValue
     }
 }
 
+/// пара
+#[inline(always)]
+fn parse_pair(value: u64) -> DecompositionValue
+{
+    DecompositionValue::Pair((
+        Codepoint::from_baked(value as u32),
+        Codepoint::from_baked((value >> 32) as u32),
+    ))
+}
+
 /// нестартер без декомпозиции
 #[inline(always)]
 fn parse_nonstarter(value: u64) -> DecompositionValue
@@ -60,11 +70,11 @@ fn parse_singleton(value: u64) -> DecompositionValue
     DecompositionValue::Singleton(Codepoint::from_baked((value >> 8) as u32))
 }
 
-/// пара
+/// декомпозиция, вынесенная во внешний блок
 #[inline(always)]
-fn parse_pair(value: u64) -> DecompositionValue
+fn parse_expansion(value: u64) -> DecompositionValue
 {
-    DecompositionValue::Pair(unsafe { core::mem::transmute(value & !0xFF) })
+    DecompositionValue::Expansion((value >> 16) as u16, (value >> 8) as u8)
 }
 
 /// 16-битная тройка
@@ -76,11 +86,4 @@ fn parse_triple_16bit(value: u64) -> DecompositionValue
         Codepoint::from_baked(((value >> 8) as u32) >> 8),
         Codepoint::from_baked((value >> 40) as u32),
     )
-}
-
-/// декомпозиция, вынесенная во внешний блок
-#[inline(always)]
-fn parse_expansion(value: u64) -> DecompositionValue
-{
-    DecompositionValue::Expansion((value >> 16) as u16, (value >> 8) as u8)
 }

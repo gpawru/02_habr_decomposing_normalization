@@ -11,10 +11,10 @@ const MARKER_STARTER: u8 = 0;
 const MARKER_NONSTARTER: u8 = 1;
 /// 16-битная пара
 const MARKER_PAIR: u8 = 2;
-/// синглтон
-const MARKER_SINGLETON: u8 = 3;
 /// декомпозиция, вынесенная во внешний блок
-const MARKER_EXPANSION: u8 = 4;
+const MARKER_EXPANSION: u8 = 3;
+/// синглтон
+const MARKER_SINGLETON: u8 = 4;
 /// слог хангыль
 const MARKER_HANGUL: u8 = 5;
 
