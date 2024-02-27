@@ -138,53 +138,55 @@ impl DecomposingNormalizer
         buffer: &mut Vec<Codepoint>,
     )
     {
+        match data_value as u8 {
+            1 | 3 => (),
+            _ => flush(result, buffer),
+        }
+
         let decomposition = parse_data_value(data_value);
 
         match decomposition {
-            DecompositionValue::Nonstarter(c1) => buffer.push(c1),
             DecompositionValue::Pair((c1, c2)) => {
-                flush(result, buffer);
                 write_char(result, c1 as u32);
 
                 let c2 = c2 as u32;
-                let c2_value = self.get_decomposition_value(c2);
+                let ccc = (self.get_decomposition_value(c2) >> 8) as u8;
 
-                match c2_value == 0 {
-                    true => write_char(result, c2 as u32),
-                    false => buffer.push(Codepoint::from_code_and_ccc(
-                        c2,
-                        ((c2_value >> 8) as u8) & 0x3F,
-                    )),
+                match ccc != 0 {
+                    true => buffer.push(Codepoint::from_code_and_ccc(c2, ccc)),
+                    false => write_char(result, c2 as u32),
                 }
             }
-            DecompositionValue::Singleton(c1) => {
-                flush(result, buffer);
-                write(result, c1);
+            DecompositionValue::Nonstarter(ccc) => {
+                buffer.push(Codepoint::from_code_and_ccc(code, ccc))
+            }
+
+            DecompositionValue::Singleton(code) => {
+                write_char(result, code);
             }
             DecompositionValue::Expansion(index, count) => {
                 for &entry in
                     &self.expansions[(index as usize) .. (index as usize + count as usize)]
                 {
-                    let codepoint = Codepoint::from_baked(entry);
-
-                    match codepoint.is_starter() {
+                    match entry as u8 != 0 {
                         true => {
-                            flush(result, buffer);
-                            write(result, codepoint);
+                            buffer.push(Codepoint::from_baked(entry));
                         }
-                        false => buffer.push(codepoint),
+                        false => {
+                            flush(result, buffer);
+                            write_char(result, entry >> 8);
+                        }
                     }
                 }
             }
             DecompositionValue::Hangul => {
-                flush(result, buffer);
                 decompose_hangul_syllable(result, code);
             }
         }
     }
 
     /// данные о декомпозиции символа
-    #[inline(always)]
+    #[inline]
     fn get_decomposition_value(&self, code: u32) -> u32
     {
         // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
@@ -209,6 +211,23 @@ impl DecomposingNormalizer
     }
 }
 
+/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
+#[inline]
+fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
+{
+    if !buffer.is_empty() {
+        if buffer.len() > 1 {
+            buffer.sort_by_key(|codepoint| codepoint.ccc());
+        }
+
+        for &codepoint in buffer.iter() {
+            write(result, codepoint);
+        }
+
+        buffer.clear();
+    };
+}
+
 /// дописать символ(по коду) в результат
 #[inline(always)]
 fn write_char(result: &mut String, code: u32)
@@ -228,21 +247,4 @@ fn write(result: &mut String, codepoint: Codepoint)
 fn write_str(result: &mut String, string: &[u8])
 {
     result.push_str(unsafe { from_utf8_unchecked(string) });
-}
-
-/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
-#[inline(always)]
-fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
-{
-    if !buffer.is_empty() {
-        if buffer.len() > 1 {
-            buffer.sort_by_key(|codepoint| codepoint.ccc());
-        }
-
-        for &codepoint in buffer.iter() {
-            write(result, codepoint);
-        }
-
-        buffer.clear();
-    };
 }

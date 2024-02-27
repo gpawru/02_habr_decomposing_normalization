@@ -1,5 +1,3 @@
-use crate::codepoint::Codepoint;
-
 pub mod hangul;
 
 /// последний кодпоинт с декомпозицией
@@ -16,12 +14,12 @@ const MARKER_HANGUL: u8 = 4;
 
 pub enum DecompositionValue
 {
-    /// нестартер (например, диакретический знак)
-    Nonstarter(Codepoint),
     /// декомпозиция на 2 кодпоинта, первый - стартер
     Pair((u16, u16)),
+    /// нестартер (например, диакретический знак)
+    Nonstarter(u8),
     /// синглтон (стартер, декомпозирующийся в другой стартер)
-    Singleton(Codepoint),
+    Singleton(u32),
     /// декомпозиция на несколько символов, в параметрах - индекс первого элемента в дополнительной таблице и количество этих элементов
     Expansion(u16, u8),
     /// слог хангыль
@@ -45,27 +43,21 @@ pub fn parse_data_value(value: u32) -> DecompositionValue
 #[inline(always)]
 fn parse_nonstarter(value: u32) -> DecompositionValue
 {
-    DecompositionValue::Nonstarter(Codepoint::from_code_and_ccc(
-        value >> 14,
-        ((value >> 8) as u8) & 0x3F,
-    ))
+    DecompositionValue::Nonstarter((value >> 8) as u8)
 }
 
 /// синглтон
 #[inline(always)]
 fn parse_singleton(value: u32) -> DecompositionValue
 {
-    DecompositionValue::Singleton(Codepoint::from_code_and_ccc(
-        value >> 14,
-        ((value >> 8) as u8) & 0x3F,
-    ))
+    DecompositionValue::Singleton(value >> 8)
 }
 
 /// пара
 #[inline(always)]
 fn parse_pair(value: u32) -> DecompositionValue
 {
-    DecompositionValue::Pair(unsafe { core::mem::transmute(value) })
+    DecompositionValue::Pair((value as u16, (value >> 16) as u16))
 }
 
 /// декомпозиция, вынесенная во внешний блок
