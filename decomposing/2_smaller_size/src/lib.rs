@@ -139,8 +139,8 @@ impl DecomposingNormalizer
     )
     {
         match data_value as u8 {
-            1 | 3 => (),
-            _ => flush(result, buffer),
+            MARKER_NONSTARTER | MARKER_EXPANSION => (),
+            _ => flush_in(result, buffer),
         }
 
         let decomposition = parse_data_value(data_value);
@@ -160,10 +160,7 @@ impl DecomposingNormalizer
             DecompositionValue::Nonstarter(ccc) => {
                 buffer.push(Codepoint::from_code_and_ccc(code, ccc))
             }
-
-            DecompositionValue::Singleton(code) => {
-                write_char(result, code);
-            }
+            DecompositionValue::Singleton(code) => write_char(result, code),
             DecompositionValue::Expansion(index, count) => {
                 for &entry in
                     &self.expansions[(index as usize) .. (index as usize + count as usize)]
@@ -173,20 +170,18 @@ impl DecomposingNormalizer
                             buffer.push(Codepoint::from_baked(entry));
                         }
                         false => {
-                            flush(result, buffer);
+                            flush_in(result, buffer);
                             write_char(result, entry >> 8);
                         }
                     }
                 }
             }
-            DecompositionValue::Hangul => {
-                decompose_hangul_syllable(result, code);
-            }
+            DecompositionValue::Hangul => decompose_hangul_syllable(result, code),
         }
     }
 
     /// данные о декомпозиции символа
-    #[inline]
+    #[inline(always)]
     fn get_decomposition_value(&self, code: u32) -> u32
     {
         // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
@@ -211,9 +206,16 @@ impl DecomposingNormalizer
     }
 }
 
-/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
-#[inline]
+/// не-инлайн вариант функции
+#[inline(never)]
 fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
+{
+    flush_in(result, buffer)
+}
+
+/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
+#[inline(always)]
+fn flush_in(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
     if !buffer.is_empty() {
         if buffer.len() > 1 {

@@ -4,13 +4,13 @@ pub mod hangul;
 pub const LAST_DECOMPOSING_CODEPOINT: u32 = 0x2FA1D;
 
 /// нестартер без декомпозиции
-const MARKER_NONSTARTER: u8 = 1;
+pub const MARKER_NONSTARTER: u8 = 1;
 /// синглтон
-const MARKER_SINGLETON: u8 = 2;
+pub const MARKER_SINGLETON: u8 = 2;
 /// декомпозиция, вынесенная во внешний блок
-const MARKER_EXPANSION: u8 = 3;
+pub const MARKER_EXPANSION: u8 = 3;
 /// слог хангыль
-const MARKER_HANGUL: u8 = 4;
+pub const MARKER_HANGUL: u8 = 4;
 
 pub enum DecompositionValue
 {
