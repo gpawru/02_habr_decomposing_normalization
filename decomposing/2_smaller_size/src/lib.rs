@@ -19,7 +19,7 @@ mod utf8;
 pub struct DecomposingNormalizer
 {
     /// основные данные
-    data: Aligned<'static, u64>,
+    data: Aligned<'static, u32>,
     /// индекс блока
     index: Aligned<'static, u8>,
     /// данные кодпоинтов, которые не вписываются в основную часть
@@ -82,7 +82,7 @@ impl DecomposingNormalizer
         iter: &mut CharsIter,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
-    ) -> Option<(u64, u32)>
+    ) -> Option<(u32, u32)>
     {
         Some(loop {
             if iter.is_empty() {
@@ -129,10 +129,10 @@ impl DecomposingNormalizer
 
     /// 1. обработать и записать в строку-результат текущее содержимое буфера (кроме случая с нестартерами),
     /// 2. записать / дописать в буфер декомпозицию кодпоинта (стартер - сразу в результат)
-    #[inline(always)]
+    #[inline(never)]
     fn handle_decomposition_value(
         &self,
-        data_value: u64,
+        data_value: u32,
         code: u32,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
@@ -144,26 +144,17 @@ impl DecomposingNormalizer
             DecompositionValue::Nonstarter(c1) => buffer.push(c1),
             DecompositionValue::Pair((c1, c2)) => {
                 flush(result, buffer);
-                write(result, c1);
+                write_char(result, c1 as u32);
 
-                match c2.is_starter() {
-                    true => write(result, c2),
-                    false => buffer.push(c2),
-                }
-            }
-            DecompositionValue::Triple(c1, c2, c3) => {
-                flush(result, buffer);
-                write(result, c1);
+                let c2 = c2 as u32;
+                let c2_value = self.get_decomposition_value(c2);
 
-                if c3.is_starter() {
-                    write(result, c2);
-                    write(result, c3);
-                } else {
-                    match c2.is_starter() {
-                        true => write(result, c2),
-                        false => buffer.push(c2),
-                    }
-                    buffer.push(c3);
+                match c2_value == 0 {
+                    true => write_char(result, c2 as u32),
+                    false => buffer.push(Codepoint::from_code_and_ccc(
+                        c2,
+                        ((c2_value >> 8) as u8) & 0x3F,
+                    )),
                 }
             }
             DecompositionValue::Singleton(c1) => {
@@ -194,7 +185,7 @@ impl DecomposingNormalizer
 
     /// данные о декомпозиции символа
     #[inline(always)]
-    fn get_decomposition_value(&self, code: u32) -> u64
+    fn get_decomposition_value(&self, code: u32) -> u32
     {
         // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
         if code > LAST_DECOMPOSING_CODEPOINT {
@@ -216,6 +207,13 @@ impl DecomposingNormalizer
             }
         }
     }
+}
+
+/// дописать символ(по коду) в результат
+#[inline(always)]
+fn write_char(result: &mut String, code: u32)
+{
+    result.push(unsafe { char::from_u32_unchecked(code) });
 }
 
 /// дописать кодпоинт в UTF-8 результат

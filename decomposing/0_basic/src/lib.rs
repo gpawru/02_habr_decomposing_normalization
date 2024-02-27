@@ -10,7 +10,7 @@ mod decomposition;
 #[repr(align(64))]
 pub struct DecomposingNormalizer<'a>
 {
-    /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x7E, в NFKD - 0xA6
+    /// индекс блока
     index: &'a [u8],
     /// основные данные
     data: &'a [u64],

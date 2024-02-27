@@ -1,7 +1,7 @@
 .idea/
 .vscode/
 target/
-temp/
+.temp/
 
 Cargo.lock
 .DS_Store
