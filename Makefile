@@ -3,9 +3,5 @@ bench:
 	cd benches && cargo bench >> report.txt && cargo run report.txt && rm report.txt
 
 # тесты
-test:
+tests:
 	cd tests && cargo test
-
-# подготовка данных
-bake:
-	cd prepare && cargo run
