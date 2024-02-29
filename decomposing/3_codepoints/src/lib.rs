@@ -115,13 +115,14 @@ impl DecomposingNormalizer
 
         let data_value = self.get_decomposition_value(code);
 
-        if data_value == 0 {
-            flush(result, buffer);
-            write(result, Codepoint::from_code(code));
-            return None;
+        match data_value != 0 {
+            true => Some((data_value, code)),
+            false => {
+                flush(result, buffer);
+                write(result, Codepoint::from_code(code));
+                None
+            }
         }
-
-        Some((data_value, code))
     }
 
     /// цикл быстрой проверки, является-ли часть строки уже нормализованной
@@ -129,7 +130,7 @@ impl DecomposingNormalizer
     fn fast_forward(&self, iter: &mut CharsIter, result: &mut Vec<Codepoint>)
         -> Option<(u64, u32)>
     {
-        Some(loop {
+        loop {
             if iter.is_empty() {
                 return None;
             }
@@ -153,18 +154,17 @@ impl DecomposingNormalizer
 
             let data_value = self.get_decomposition_value(code);
 
-            if data_value == 0 {
-                write(result, Codepoint::from_code(code));
-                continue;
+            if data_value != 0 {
+                return Some((data_value, code));
             }
 
-            break (data_value, code);
-        })
+            write(result, Codepoint::from_code(code));
+        }
     }
 
     /// 1. обработать и записать в строку-результат текущее содержимое буфера (кроме случая с нестартерами),
     /// 2. записать / дописать в буфер декомпозицию кодпоинта (стартер - сразу в результат)
-    #[inline(never)]
+    #[inline(always)]
     fn handle_decomposition_value(
         &self,
         data_value: u64,
