@@ -11,6 +11,7 @@ unicode_data = { git = "https://github.com/gpawru/unicode_data.git" }
 unicode_decomposing_basic = { path = "./../decomposing/0_basic" }
 unicode_decomposing = { path = "./../decomposing/1_optimized" }
 unicode_decomposing_smaller = { path ="./../decomposing/2_smaller_size" }
+unicode_decomposing_u32 = { path ="./../decomposing/3_codepoints" }
 
 [profile.test]
 opt-level = 3
