@@ -9,7 +9,7 @@ macro_rules! test {
             $left,
             $normalizer.normalize(&$right),
             stringify!($str),
-            $test.line + 1,
+            $test.line,
             $test.description
         );
     };
