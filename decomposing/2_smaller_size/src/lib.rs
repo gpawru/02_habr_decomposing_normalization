@@ -2,17 +2,27 @@ use core::str::from_utf8_unchecked;
 
 pub use codepoint::Codepoint;
 pub use data::DecompositionData;
-use decomposition::hangul::decompose_hangul_syllable;
-use decomposition::*;
+use hangul::decompose_hangul_syllable;
 use slice::aligned::Aligned;
 pub use slice::iter::CharsIter;
 
 mod codepoint;
 mod data;
-mod decomposition;
-
+mod hangul;
 mod slice;
 mod utf8;
+
+/// последний кодпоинт с декомпозицией (U+2FA1D), его блок - 0x5F4
+pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = 0x5F4;
+
+/// нестартер без декомпозиции
+pub const MARKER_NONSTARTER: u8 = 1;
+/// синглтон
+pub const MARKER_SINGLETON: u8 = 2;
+/// декомпозиция, вынесенная во внешний блок
+pub const MARKER_EXPANSION: u8 = 3;
+/// слог хангыль
+pub const MARKER_HANGUL: u8 = 4;
 
 // нормализатор NF(K)D
 #[repr(C, align(16))]
@@ -26,7 +36,6 @@ pub struct DecomposingNormalizer
     expansions: Aligned<'static, u32>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
-    _p1: [u32; 3],
 }
 /// заранее подготовленные данные
 pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
@@ -36,7 +45,6 @@ pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
         index: Aligned::from(source.index),
         expansions: Aligned::from(source.expansions),
         continuous_block_end: source.continuous_block_end,
-        _p1: [0; 3],
     }
 }
 
@@ -64,31 +72,60 @@ impl DecomposingNormalizer
         let iter = &mut CharsIter::new(input);
 
         loop {
-            iter.set_breakpoint();
+            let entry = match !buffer.is_empty() {
+                true => match self.forward(iter, &mut result, &mut buffer) {
+                    Some(entry) => Some(entry),
+                    None => continue,
+                },
+                false => self.fast_forward(iter, &mut result),
+            };
 
-            match self.fast_forward(iter, &mut result, &mut buffer) {
+            match entry {
                 Some((data_value, code)) => {
-                    self.handle_decomposition_value(data_value, code, &mut result, &mut buffer)
+                    self.handle_decomposition_value(data_value, code, &mut result, &mut buffer);
+                    iter.set_breakpoint();
                 }
                 None => return result,
-            };
+            }
         }
     }
 
-    /// цикл быстрой проверки, является-ли часть строки уже нормализованной
+    /// если буфер не пуст, мы не можем перейти к быстрой проверке.
+    /// прочитаем следующий кодпоинт, и если он стартер - скомбинируем буфер
     #[inline(always)]
-    fn fast_forward(
+    fn forward(
         &self,
         iter: &mut CharsIter,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
     ) -> Option<(u32, u32)>
     {
-        Some(loop {
-            if iter.is_empty() {
-                flush(result, buffer);
-                write_str(result, iter.ending_slice());
+        iter.set_breakpoint();
 
+        if !iter.is_empty() {
+            let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+
+            if first >= 0xC2 {
+                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+                let data_value = self.get_decomposition_value(code);
+
+                if data_value != 0 {
+                    return Some((data_value, code));
+                }
+            }
+        }
+
+        flush_inline(result, buffer);
+        None
+    }
+
+    /// цикл быстрой проверки, является-ли часть строки уже нормализованной
+    #[inline(always)]
+    fn fast_forward(&self, iter: &mut CharsIter, result: &mut String) -> Option<(u32, u32)>
+    {
+        loop {
+            if iter.is_empty() {
+                write_str(result, iter.ending_slice());
                 return None;
             }
 
@@ -110,58 +147,49 @@ impl DecomposingNormalizer
 
             let data_value = self.get_decomposition_value(code);
 
-            if data_value != 0 {
-                let width = utf8::get_utf8_sequence_width(first) as isize;
-
-                // если мы получили какую-то последовательность символов без декомпозиции:
-                //  - сливаем буфер предшествующих этому отрезку нестартеров
-                //  - сливаем отрезок от брейкпоинта до предыдущего символа
-
-                if !iter.at_breakpoint(width) {
-                    flush(result, buffer);
-                    write_str(result, iter.block_slice(width));
-                }
-
-                break (data_value, code);
+            if data_value == 0 {
+                continue;
             }
-        })
+
+            let width = utf8::get_utf8_sequence_width(first) as isize;
+
+            // если мы получили какую-то последовательность символов без декомпозиции:
+            //  - сливаем буфер предшествующих этому отрезку нестартеров
+            //  - сливаем отрезок от брейкпоинта до предыдущего символа
+
+            if !iter.at_breakpoint(width) {
+                write_str(result, iter.block_slice(width));
+            }
+
+            return Some((data_value, code));
+        }
     }
 
     /// 1. обработать и записать в строку-результат текущее содержимое буфера (кроме случая с нестартерами),
     /// 2. записать / дописать в буфер декомпозицию кодпоинта (стартер - сразу в результат)
-    #[inline(never)]
+    #[inline(always)]
     fn handle_decomposition_value(
         &self,
-        data_value: u32,
+        value: u32,
         code: u32,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
     )
     {
-        match data_value as u8 {
-            MARKER_NONSTARTER | MARKER_EXPANSION => (),
-            _ => flush_in(result, buffer),
-        }
+        let marker = value as u8;
 
-        let decomposition = parse_data_value(data_value);
-
-        match decomposition {
-            DecompositionValue::Pair((c1, c2)) => {
-                write_char(result, c1 as u32);
-
-                let c2 = c2 as u32;
-                let ccc = (self.get_decomposition_value(c2) >> 8) as u8;
-
-                match ccc != 0 {
-                    true => buffer.push(Codepoint::from_code_and_ccc(c2, ccc)),
-                    false => write_char(result, c2 as u32),
-                }
+        match marker {
+            MARKER_NONSTARTER => {
+                buffer.push(Codepoint::from_code_and_ccc(code, (value >> 8) as u8))
             }
-            DecompositionValue::Nonstarter(ccc) => {
-                buffer.push(Codepoint::from_code_and_ccc(code, ccc))
+            MARKER_SINGLETON => {
+                flush(result, buffer);
+                write_char(result, (value >> 8) as u32);
             }
-            DecompositionValue::Singleton(code) => write_char(result, code),
-            DecompositionValue::Expansion(index, count) => {
+            MARKER_EXPANSION => {
+                let index = (value >> 16) as u16;
+                let count = (value >> 8) as u8;
+
                 for &entry in
                     &self.expansions[(index as usize) .. (index as usize + count as usize)]
                 {
@@ -170,13 +198,28 @@ impl DecomposingNormalizer
                             buffer.push(Codepoint::from_baked(entry));
                         }
                         false => {
-                            flush_in(result, buffer);
+                            flush(result, buffer);
                             write_char(result, entry >> 8);
                         }
                     }
                 }
             }
-            DecompositionValue::Hangul => decompose_hangul_syllable(result, code),
+            MARKER_HANGUL => {
+                flush(result, buffer);
+                decompose_hangul_syllable(result, code);
+            }
+            _ => {
+                flush(result, buffer);
+                write_char(result, (value as u16) as u32);
+
+                let c2 = value >> 16;
+                let ccc = (self.get_decomposition_value(c2) >> 8) as u8;
+
+                match ccc != 0 {
+                    true => buffer.push(Codepoint::from_code_and_ccc(c2, ccc)),
+                    false => write_char(result, c2 as u32),
+                }
+            }
         }
     }
 
@@ -184,25 +227,26 @@ impl DecomposingNormalizer
     #[inline(always)]
     fn get_decomposition_value(&self, code: u32) -> u32
     {
+        if code <= self.continuous_block_end {
+            return self.data[code as usize];
+        }
+
+        let block_index = (code >> 7) as u16;
+
         // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
-        if code > LAST_DECOMPOSING_CODEPOINT {
+        if block_index > LAST_DECOMPOSING_CODEPOINT_BLOCK {
             return 0;
         };
 
-        match code <= self.continuous_block_end {
-            true => self.data[code as usize],
-            false => {
-                let block_index = (code >> 7) as usize;
-                let block = self.index[block_index] as usize;
+        let block_index = (code >> 7) as usize;
+        let block = self.index[block_index] as usize;
 
-                let block_offset = block << 7;
-                let code_offset = ((code as u8) & 0x7F) as usize;
+        let block_offset = block << 7;
+        let code_offset = ((code as u8) & 0x7F) as usize;
 
-                let index = block_offset | code_offset;
+        let index = block_offset | code_offset;
 
-                self.data[index]
-            }
-        }
+        self.data[index]
     }
 }
 
@@ -210,12 +254,12 @@ impl DecomposingNormalizer
 #[inline(never)]
 fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
-    flush_in(result, buffer)
+    flush_inline(result, buffer)
 }
 
 /// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
 #[inline(always)]
-fn flush_in(result: &mut String, buffer: &mut Vec<Codepoint>)
+fn flush_inline(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
     if !buffer.is_empty() {
         if buffer.len() > 1 {

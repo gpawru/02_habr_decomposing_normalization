@@ -73,7 +73,7 @@ impl DecomposingNormalizer
         let iter = &mut CharsIter::new(input);
 
         loop {
-            let entry: Option<(u64, u32)> = match !buffer.is_empty() {
+            let entry = match !buffer.is_empty() {
                 true => match self.forward(iter, &mut result, &mut buffer) {
                     Some(entry) => Some(entry),
                     None => continue,
@@ -182,7 +182,7 @@ impl DecomposingNormalizer
         match marker {
             MARKER_NONSTARTER => buffer.push(Codepoint::from_baked((value >> 8) as u32)),
             MARKER_PAIR => {
-                flush(result, buffer);
+                flush_inline(result, buffer);
 
                 let (c1, c2) =
                     unsafe { core::mem::transmute::<u64, (Codepoint, Codepoint)>(value) };
@@ -249,9 +249,9 @@ impl DecomposingNormalizer
             return self.data[code as usize];
         }
 
-        // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
         let block_index = (code >> 7) as u16;
 
+        // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
         if block_index > LAST_DECOMPOSING_CODEPOINT_BLOCK {
             return 0;
         };
