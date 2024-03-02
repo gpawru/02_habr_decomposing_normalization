@@ -37,6 +37,7 @@ pub struct DecomposingNormalizer
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
 }
+
 /// заранее подготовленные данные
 pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
 {
