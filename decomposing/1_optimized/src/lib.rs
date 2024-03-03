@@ -1,3 +1,5 @@
+use core::str::from_utf8_unchecked;
+
 pub use codepoint::Codepoint;
 pub use data::DecompositionData;
 use hangul::decompose_hangul_syllable;
@@ -14,22 +16,20 @@ mod utf8;
 pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = 0x5F4;
 
 /// нестартер без декомпозиции
-const MARKER_NONSTARTER: u8 = 1;
-/// 16-битная пара
-const MARKER_PAIR: u8 = 2;
-/// декомпозиция, вынесенная во внешний блок
-const MARKER_EXPANSION: u8 = 3;
+pub const MARKER_NONSTARTER: u8 = 1;
 /// синглтон
-const MARKER_SINGLETON: u8 = 4;
+pub const MARKER_SINGLETON: u8 = 2;
+/// декомпозиция, вынесенная во внешний блок
+pub const MARKER_EXPANSION: u8 = 3;
 /// слог хангыль
-const MARKER_HANGUL: u8 = 5;
+pub const MARKER_HANGUL: u8 = 4;
 
 // нормализатор NF(K)D
 #[repr(C, align(16))]
 pub struct DecomposingNormalizer
 {
     /// основные данные
-    data: Aligned<'static, u64>,
+    data: Aligned<'static, u32>,
     /// индекс блока
     index: Aligned<'static, u8>,
     /// данные кодпоинтов, которые не вписываются в основную часть
@@ -99,7 +99,7 @@ impl DecomposingNormalizer
         iter: &mut CharsIter,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
-    ) -> Option<(u64, u32)>
+    ) -> Option<(u32, u32)>
     {
         iter.set_breakpoint();
 
@@ -122,7 +122,7 @@ impl DecomposingNormalizer
 
     /// цикл быстрой проверки, является-ли часть строки уже нормализованной
     #[inline(always)]
-    fn fast_forward(&self, iter: &mut CharsIter, result: &mut String) -> Option<(u64, u32)>
+    fn fast_forward(&self, iter: &mut CharsIter, result: &mut String) -> Option<(u32, u32)>
     {
         loop {
             if iter.is_empty() {
@@ -171,7 +171,7 @@ impl DecomposingNormalizer
     #[inline(always)]
     fn handle_decomposition_value(
         &self,
-        value: u64,
+        value: u32,
         code: u32,
         result: &mut String,
         buffer: &mut Vec<Codepoint>,
@@ -180,23 +180,12 @@ impl DecomposingNormalizer
         let marker = value as u8;
 
         match marker {
-            MARKER_NONSTARTER => buffer.push(Codepoint::from_baked((value >> 8) as u32)),
-            MARKER_PAIR => {
-                flush_inline(result, buffer);
-
-                let (c1, c2) =
-                    unsafe { core::mem::transmute::<u64, (Codepoint, Codepoint)>(value) };
-
-                write(result, c1);
-
-                match c2.is_nonstarter() {
-                    true => buffer.push(c2),
-                    false => write(result, c2),
-                };
+            MARKER_NONSTARTER => {
+                buffer.push(Codepoint::from_code_and_ccc(code, (value >> 8) as u8))
             }
             MARKER_SINGLETON => {
                 flush(result, buffer);
-                write(result, Codepoint::from_baked((value >> 8) as u32));
+                write_char(result, (value >> 8) as u32);
             }
             MARKER_EXPANSION => {
                 let index = (value >> 16) as u16;
@@ -205,14 +194,14 @@ impl DecomposingNormalizer
                 for &entry in
                     &self.expansions[(index as usize) .. (index as usize + count as usize)]
                 {
-                    let codepoint = Codepoint::from_baked(entry);
-
-                    match codepoint.is_starter() {
+                    match entry as u8 != 0 {
                         true => {
-                            flush(result, buffer);
-                            write(result, codepoint);
+                            buffer.push(Codepoint::from_baked(entry));
                         }
-                        false => buffer.push(codepoint),
+                        false => {
+                            flush(result, buffer);
+                            write_char(result, entry >> 8);
+                        }
                     }
                 }
             }
@@ -222,20 +211,14 @@ impl DecomposingNormalizer
             }
             _ => {
                 flush(result, buffer);
-                write_code(result, (value as u16) as u32);
+                write_char(result, (value as u16) as u32);
 
-                let c2 = Codepoint::from_baked(((value >> 8) as u32) >> 8);
-                let c3 = Codepoint::from_baked((value >> 40) as u32);
+                let c2 = value >> 16;
+                let ccc = (self.get_decomposition_value(c2) >> 8) as u8;
 
-                if c3.is_starter() {
-                    write(result, c2);
-                    write(result, c3);
-                } else {
-                    match c2.is_starter() {
-                        true => write(result, c2),
-                        false => buffer.push(c2),
-                    }
-                    buffer.push(c3);
+                match ccc != 0 {
+                    true => buffer.push(Codepoint::from_code_and_ccc(c2, ccc)),
+                    false => write_char(result, c2 as u32),
                 }
             }
         }
@@ -243,7 +226,7 @@ impl DecomposingNormalizer
 
     /// данные о декомпозиции символа
     #[inline(always)]
-    fn get_decomposition_value(&self, code: u32) -> u64
+    fn get_decomposition_value(&self, code: u32) -> u32
     {
         if code <= self.continuous_block_end {
             return self.data[code as usize];
@@ -268,28 +251,7 @@ impl DecomposingNormalizer
     }
 }
 
-/// дописать кодпоинт в UTF-8 результат
-#[inline(always)]
-fn write(result: &mut String, codepoint: Codepoint)
-{
-    result.push(char::from(codepoint));
-}
-
-/// дописать символ по его коду
-#[inline(always)]
-fn write_code(result: &mut String, code: u32)
-{
-    result.push(unsafe { char::from_u32_unchecked(code) });
-}
-
-/// дописать уже нормализованный кусок исходной строки в UTF-8 результат
-#[inline(always)]
-fn write_str(result: &mut String, string: &[u8])
-{
-    result.push_str(unsafe { core::str::from_utf8_unchecked(string) });
-}
-
-/// отсортировать кодпоинты буфера по CCC, записать в результат и освободить буфер
+/// не-инлайн вариант функции
 #[inline(never)]
 fn flush(result: &mut String, buffer: &mut Vec<Codepoint>)
 {
@@ -311,4 +273,25 @@ fn flush_inline(result: &mut String, buffer: &mut Vec<Codepoint>)
 
         buffer.clear();
     };
+}
+
+/// дописать символ(по коду) в результат
+#[inline(always)]
+fn write_char(result: &mut String, code: u32)
+{
+    result.push(unsafe { char::from_u32_unchecked(code) });
+}
+
+/// дописать кодпоинт в UTF-8 результат
+#[inline(always)]
+fn write(result: &mut String, codepoint: Codepoint)
+{
+    result.push(char::from(codepoint));
+}
+
+/// дописать уже нормализованный кусок исходной строки в UTF-8 результат
+#[inline(always)]
+fn write_str(result: &mut String, string: &[u8])
+{
+    result.push_str(unsafe { from_utf8_unchecked(string) });
 }

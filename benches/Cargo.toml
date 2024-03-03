@@ -8,8 +8,6 @@ criterion = "0.5.1"
 icu_normalizer = "1.4.1"
 
 unicode_decomposing = { path = "./../decomposing/1_optimized" }
-unicode_decomposing_smaller = { path = "./../decomposing/2_smaller_size" }
-unicode_decomposing_u32 = { path = "./../decomposing/3_codepoints" }
 
 [[bench]]
 name = "my"
@@ -17,18 +15,8 @@ path = "benches/my.rs"
 harness = false
 
 [[bench]]
-name = "sm"
-path = "benches/smaller.rs"
-harness = false
-
-[[bench]]
 name = "icu"
 path = "benches/icu.rs"
-harness = false
-
-[[bench]]
-name = "u32"
-path = "benches/u32.rs"
 harness = false
 
 [profile.bench]

@@ -34,4 +34,3 @@ pub fn decompose_hangul_syllable(result: &mut String, code: u32)
         }
     };
 }
-

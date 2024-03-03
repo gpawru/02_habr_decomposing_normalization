@@ -13,7 +13,7 @@ pub struct DecomposingNormalizer<'a>
     /// индекс блока
     index: &'a [u8],
     /// основные данные
-    data: &'a [u64],
+    data: &'a [u32],
     /// данные кодпоинтов, которые не вписываются в основную часть
     expansions: &'a [u32],
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
@@ -64,29 +64,19 @@ impl<'a> DecomposingNormalizer<'a>
                     flush(&mut result, &mut buffer);
                     write(&mut result, Codepoint::from_code(code));
                 }
-                DecompositionValue::Nonstarter(c1) => buffer.push(c1),
-                DecompositionValue::Pair((c1, c2)) => {
+                DecompositionValue::Nonstarter(ccc) => {
+                    buffer.push(Codepoint::from_code_and_ccc(code, ccc))
+                }
+                DecompositionValue::Pair(c1, c2_code) => {
                     flush(&mut result, &mut buffer);
                     write(&mut result, c1);
+
+                    let c2_ccc = (self.get_decomposition_value(c2_code) >> 8) as u8;
+                    let c2 = Codepoint::from_code_and_ccc(c2_code, c2_ccc);
 
                     match c2.is_starter() {
                         true => write(&mut result, c2),
                         false => buffer.push(c2),
-                    }
-                }
-                DecompositionValue::Triple(c1, c2, c3) => {
-                    flush(&mut result, &mut buffer);
-                    write(&mut result, c1);
-
-                    if c3.is_starter() {
-                        write(&mut result, c2);
-                        write(&mut result, c3);
-                    } else {
-                        match c2.is_starter() {
-                            true => write(&mut result, c2),
-                            false => buffer.push(c2),
-                        }
-                        buffer.push(c3);
                     }
                 }
                 DecompositionValue::Singleton(c1) => {
@@ -134,7 +124,7 @@ impl<'a> DecomposingNormalizer<'a>
 
     /// данные о декомпозиции символа
     #[inline(always)]
-    fn get_decomposition_value(&self, code: u32) -> u64
+    fn get_decomposition_value(&self, code: u32) -> u32
     {
         match code <= self.continuous_block_end {
             true => self.data[code as usize],

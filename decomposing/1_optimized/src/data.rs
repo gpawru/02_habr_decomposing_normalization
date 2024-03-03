@@ -4,7 +4,7 @@ pub struct DecompositionData<'a>
     /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x80, в NFKD - 0xA8
     pub index: &'a [u8],
     /// основные данные
-    pub data: &'a [u64],
+    pub data: &'a [u32],
     /// данные кодпоинтов, которые не вписываются в основную часть
     pub expansions: &'a [u32],
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
@@ -14,11 +14,11 @@ pub struct DecompositionData<'a>
 /// данные для NFD-нормализации
 pub fn nfd<'a>() -> DecompositionData<'a>
 {
-    include!("./../../../data/nfd.rs.txt")
+    include!("./../../../data/nfd.u32.rs.txt")
 }
 
 /// данные для NFKD-нормализации
 pub fn nfkd<'a>() -> DecompositionData<'a>
 {
-    include!("./../../../data/nfkd.rs.txt")
+    include!("./../../../data/nfkd.u32.rs.txt")
 }
