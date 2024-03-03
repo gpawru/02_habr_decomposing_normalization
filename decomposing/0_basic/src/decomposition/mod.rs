@@ -38,7 +38,7 @@ pub enum DecompositionValue
 
 /// парсим значение из таблицы
 #[inline(always)]
-pub fn parse_data_value(value: u64) -> DecompositionValue
+pub fn parse_dec_value(value: u64) -> DecompositionValue
 {
     match value as u8 {
         MARKER_STARTER => DecompositionValue::None,

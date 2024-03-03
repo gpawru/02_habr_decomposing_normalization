@@ -129,7 +129,7 @@ impl<'a> DecomposingNormalizer<'a>
             return DecompositionValue::None;
         };
 
-        parse_data_value(self.get_decomposition_value(code))
+        parse_dec_value(self.get_decomposition_value(code))
     }
 
     /// данные о декомпозиции символа

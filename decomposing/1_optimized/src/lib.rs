@@ -82,8 +82,8 @@ impl DecomposingNormalizer
             };
 
             match entry {
-                Some((data_value, code)) => {
-                    self.handle_decomposition_value(data_value, code, &mut result, &mut buffer);
+                Some((dec_value, code)) => {
+                    self.handle_decomposition_value(dec_value, code, &mut result, &mut buffer);
                     iter.set_breakpoint();
                 }
                 None => return result,
@@ -108,10 +108,10 @@ impl DecomposingNormalizer
 
             if first >= 0xC2 {
                 let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
-                let data_value = self.get_decomposition_value(code);
+                let dec_value = self.get_decomposition_value(code);
 
-                if data_value != 0 {
-                    return Some((data_value, code));
+                if dec_value != 0 {
+                    return Some((dec_value, code));
                 }
             }
         }
@@ -146,9 +146,9 @@ impl DecomposingNormalizer
             // символ за границами "безопасной зоны". проверяем кейс декомпозиции:
             // если он является обычным стартером без декомпозиции, то продолжаем цикл
 
-            let data_value = self.get_decomposition_value(code);
+            let dec_value = self.get_decomposition_value(code);
 
-            if data_value == 0 {
+            if dec_value == 0 {
                 continue;
             }
 
@@ -162,7 +162,7 @@ impl DecomposingNormalizer
                 write_str(result, iter.block_slice(width));
             }
 
-            return Some((data_value, code));
+            return Some((dec_value, code));
         }
     }
 
