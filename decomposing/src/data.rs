@@ -1,8 +1,8 @@
 /// структура хранимых данных для нормализации
 pub struct DecompositionData<'a>
 {
-    /// индекс блока. u8 достаточно, т.к. в NFD последний блок - 0x80, в NFKD - 0xA8
-    pub index: &'a [u8],
+    /// индекс блока
+    pub index: &'a [u16],
     /// основные данные
     pub data: &'a [u32],
     /// данные кодпоинтов, которые не вписываются в основную часть
@@ -14,11 +14,11 @@ pub struct DecompositionData<'a>
 /// данные для NFD-нормализации
 pub fn nfd<'a>() -> DecompositionData<'a>
 {
-    include!("./../../../data/nfd.u32.rs.txt")
+    include!("./../../data/nfd.txt")
 }
 
 /// данные для NFKD-нормализации
 pub fn nfkd<'a>() -> DecompositionData<'a>
 {
-    include!("./../../../data/nfkd.u32.rs.txt")
+    include!("./../../data/nfkd.txt")
 }

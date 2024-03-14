@@ -10,10 +10,10 @@ const HANGUL_T_COUNT: u32 = 27;
 const HANGUL_T_BLOCK_SIZE: u32 = HANGUL_T_COUNT + 1;
 
 /// декомпозиция слога хангыль
-#[inline(always)]
+#[inline(never)]
 pub fn decompose_hangul_syllable(result: &mut String, code: u32)
 {
-    let lvt = code - HANGUL_S_BASE;
+    let lvt = code.wrapping_sub(HANGUL_S_BASE);
 
     let l = (lvt / HANGUL_N_COUNT) as u8;
     let v = ((lvt % HANGUL_N_COUNT) / HANGUL_T_BLOCK_SIZE) as u8;

@@ -1,6 +1,5 @@
 use icu_normalizer::DecomposingNormalizer as icu;
-use unicode_decomposing as optimized;
-use unicode_decomposing_basic as basic;
+use unicode_decomposing::DecomposingNormalizer as my;
 
 /// сравниваем с результатами нормализации ICU
 #[test]
@@ -35,8 +34,5 @@ fn icu()
         };
     }
 
-    test!(
-        (basic::new_nfd(), basic::new_nfkd(), "basic"),
-        (optimized::new_nfd(), optimized::new_nfkd(), "optimized")
-    );
+    test!((my::new_nfd(), my::new_nfkd(), "my"));
 }

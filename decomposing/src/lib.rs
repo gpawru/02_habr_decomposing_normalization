@@ -13,16 +13,27 @@ mod slice;
 mod utf8;
 
 /// последний кодпоинт с декомпозицией (U+2FA1D), его блок - 0x5F4
-pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = 0x5F4;
+pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = (0x2FA1D >> (18 - 11)) as u16;
 
+/// стартер
+pub const MARKER_STARTER: u8 = 0b_000;
+/// маркер композиции с предыдущим кодпоинтом, в контексте декомпозиции - просто стартер
+/// здесь же - V, T чамо хангыль
+pub const MARKER_COMBINES_BACKWARDS: u8 = 0b_001;
 /// нестартер без декомпозиции
-pub const MARKER_NONSTARTER: u8 = 1;
+pub const MARKER_NONSTARTER: u8 = 0b_010;
 /// синглтон
-pub const MARKER_SINGLETON: u8 = 2;
+pub const MARKER_SINGLETON: u8 = 0b_011;
 /// декомпозиция, вынесенная во внешний блок
-pub const MARKER_EXPANSION: u8 = 3;
+pub const MARKER_EXPANSION: u8 = 0b_100;
+/// декомпозиция, вынесенная во внешний блок, в контексте NF(K)D - здесь могут
+/// присутствовать не-стартеры, за которыми идут стартеры;
+/// во внешнем блоке присутствует дополнительный u32, его пропускаем
+pub const MARKER_EXPANSION_COMBINED_PATCH: u8 = 0b_101;
+/// декомпозиция, вынесенная во внешний блок, в контексте NF(K)D - никакой разницы с MARKER_EXPANSION
+pub const MARKER_EXPANSION_COMBINED_EMPTY: u8 = 0b_110;
 /// слог хангыль
-pub const MARKER_HANGUL: u8 = 4;
+pub const MARKER_HANGUL: u8 = 0b_111;
 
 // нормализатор NF(K)D
 #[repr(C, align(16))]
@@ -31,34 +42,11 @@ pub struct DecomposingNormalizer
     /// основные данные
     data: Aligned<'static, u32>,
     /// индекс блока
-    index: Aligned<'static, u8>,
+    index: Aligned<'static, u16>,
     /// данные кодпоинтов, которые не вписываются в основную часть
     expansions: Aligned<'static, u32>,
     /// с U+0000 и до этого кодпоинта включительно блоки в data идут последовательно
     continuous_block_end: u32,
-}
-
-/// заранее подготовленные данные
-pub fn from_baked(source: DecompositionData) -> DecomposingNormalizer
-{
-    DecomposingNormalizer {
-        data: Aligned::from(source.data),
-        index: Aligned::from(source.index),
-        expansions: Aligned::from(source.expansions),
-        continuous_block_end: source.continuous_block_end,
-    }
-}
-
-/// NFD-нормализатор
-pub fn new_nfd() -> DecomposingNormalizer
-{
-    from_baked(data::nfd())
-}
-
-/// NFKD-нормализатор
-pub fn new_nfkd() -> DecomposingNormalizer
-{
-    from_baked(data::nfkd())
 }
 
 impl DecomposingNormalizer
@@ -110,7 +98,7 @@ impl DecomposingNormalizer
                 let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
                 let dec_value = self.get_decomposition_value(code);
 
-                if dec_value != 0 {
+                if (dec_value as u8 >> 2) != 0 {
                     return Some((dec_value, code));
                 }
             }
@@ -148,7 +136,7 @@ impl DecomposingNormalizer
 
             let dec_value = self.get_decomposition_value(code);
 
-            if dec_value == 0 {
+            if (dec_value as u8 >> 2) == 0 {
                 continue;
             }
 
@@ -177,7 +165,7 @@ impl DecomposingNormalizer
         buffer: &mut Vec<Codepoint>,
     )
     {
-        let marker = value as u8;
+        let marker = (value as u8) >> 1;
 
         match marker {
             MARKER_NONSTARTER => {
@@ -187,23 +175,11 @@ impl DecomposingNormalizer
                 flush(result, buffer);
                 write_char(result, (value >> 8) as u32);
             }
-            MARKER_EXPANSION => {
-                let index = (value >> 16) as u16;
-                let count = (value >> 8) as u8;
-
-                for &entry in
-                    &self.expansions[(index as usize) .. (index as usize + count as usize)]
-                {
-                    match entry as u8 != 0 {
-                        true => {
-                            buffer.push(Codepoint::from_baked(entry));
-                        }
-                        false => {
-                            flush(result, buffer);
-                            write_char(result, entry >> 8);
-                        }
-                    }
-                }
+            MARKER_EXPANSION | MARKER_EXPANSION_COMBINED_EMPTY => {
+                handle_expansion(value, result, buffer, &self.expansions, false);
+            }
+            MARKER_EXPANSION_COMBINED_PATCH => {
+                handle_expansion(value, result, buffer, &self.expansions, true);
             }
             MARKER_HANGUL => {
                 flush(result, buffer);
@@ -211,7 +187,7 @@ impl DecomposingNormalizer
             }
             _ => {
                 flush(result, buffer);
-                write_char(result, (value as u16) as u32);
+                write_char(result, (value as u16 >> 1) as u32);
 
                 let c2 = value >> 16;
                 let ccc = (self.get_decomposition_value(c2) >> 8) as u8;
@@ -228,27 +204,81 @@ impl DecomposingNormalizer
     #[inline(always)]
     fn get_decomposition_value(&self, code: u32) -> u32
     {
-        if code <= self.continuous_block_end {
-            return self.data[code as usize];
-        }
+        let data_block_base = match code <= self.continuous_block_end {
+            true => 0x600 | (((code >> 3) as u16) & !0x7),
+            false => {
+                let group_index = (code >> 7) as u16;
 
-        let block_index = (code >> 7) as u16;
+                // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
+                if group_index > LAST_DECOMPOSING_CODEPOINT_BLOCK {
+                    return 0;
+                };
 
-        // все кодпоинты, следующие за U+2FA1D не имеют декомпозиции
-        if block_index > LAST_DECOMPOSING_CODEPOINT_BLOCK {
-            return 0;
+                self.index[group_index as usize]
+            }
         };
 
-        let block_index = (code >> 7) as usize;
-        let block = self.index[block_index] as usize;
+        let code_offsets = (code as u16) & 0x7F;
+        let data_block_index = data_block_base | (code_offsets >> 3) as u16;
+        let index = self.index[data_block_index as usize] | code_offsets & 0x7;
 
-        let block_offset = block << 7;
-        let code_offset = ((code as u8) & 0x7F) as usize;
-
-        let index = block_offset | code_offset;
-
-        self.data[index]
+        self.data[index as usize]
     }
+
+    /// заранее подготовленные данные
+    pub fn from_baked(source: DecompositionData) -> Self
+    {
+        Self {
+            data: Aligned::from(source.data),
+            index: Aligned::from(source.index),
+            expansions: Aligned::from(source.expansions),
+            continuous_block_end: source.continuous_block_end,
+        }
+    }
+
+    /// NFD-нормализатор
+    pub fn new_nfd() -> Self
+    {
+        Self::from_baked(data::nfd())
+    }
+
+    /// NFKD-нормализатор
+    pub fn new_nfkd() -> Self
+    {
+        Self::from_baked(data::nfkd())
+    }
+}
+
+/// данные записаны в дополнительном блоке
+#[inline(always)]
+fn handle_expansion(
+    value: u32,
+    result: &mut String,
+    buffer: &mut Vec<Codepoint>,
+    expansions: &[u32],
+    shift: bool,
+)
+{
+    let last_starter = (value >> 8) & 0x1F;
+    let count = (value >> 14) & 0x1F;
+    let mut index = value >> 20;
+
+    if shift {
+        index += 1;
+    }
+
+    let expansions = &expansions[index as usize .. (index + count) as usize];
+
+    if expansions[0] as u8 == 0 {
+        flush(result, buffer);
+        expansions[.. last_starter as usize]
+            .iter()
+            .for_each(|&entry| write_char(result, entry >> 8));
+    }
+
+    expansions[last_starter as usize ..]
+        .iter()
+        .for_each(|&entry| buffer.push(Codepoint::from_baked(entry)));
 }
 
 /// не-инлайн вариант функции
