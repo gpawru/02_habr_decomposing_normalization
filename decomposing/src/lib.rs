@@ -175,10 +175,10 @@ impl DecomposingNormalizer
                 flush(result, buffer);
                 write_char(result, (value >> 8) as u32);
             }
-            MARKER_EXPANSION | MARKER_EXPANSION_COMBINED_EMPTY => {
+            MARKER_EXPANSION => {
                 handle_expansion(value, result, buffer, &self.expansions, false);
             }
-            MARKER_EXPANSION_COMBINED_PATCH => {
+            MARKER_EXPANSION_COMBINED_PATCH | MARKER_EXPANSION_COMBINED_EMPTY => {
                 handle_expansion(value, result, buffer, &self.expansions, true);
             }
             MARKER_HANGUL => {
@@ -260,8 +260,8 @@ fn handle_expansion(
 )
 {
     let last_starter = (value >> 8) & 0x1F;
-    let count = (value >> 14) & 0x1F;
-    let mut index = value >> 20;
+    let count = (value >> 13) & 0x1F;
+    let mut index = value >> 18;
 
     if shift {
         index += 1;
