@@ -10,7 +10,6 @@ mod codepoint;
 mod data;
 mod hangul;
 mod slice;
-mod utf8;
 
 /// последний кодпоинт с декомпозицией (U+2FA1D), его блок - 0x5F4
 pub const LAST_DECOMPOSING_CODEPOINT_BLOCK: u16 = (0x2FA1D >> (18 - 11)) as u16;
@@ -92,10 +91,10 @@ impl DecomposingNormalizer
         iter.set_breakpoint();
 
         if !iter.is_empty() {
-            let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+            let first = unsafe { iter.next_unchecked() };
 
             if first >= 0xC2 {
-                let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+                let code = unsafe { iter.next_nonascii_bytes_unchecked(first) };
                 let dec_value = self.get_decomposition_value(code);
 
                 if (dec_value as u8 >> 2) != 0 {
@@ -118,7 +117,7 @@ impl DecomposingNormalizer
                 return None;
             }
 
-            let first = unsafe { utf8::char_first_byte_unchecked(iter) };
+            let first = unsafe { iter.next_unchecked() };
 
             // все символы до U+00C0 (в NFD) или U+00A0 (NFKD) не имеют декомпозиции,
             // первый байт UTF-8 U+00A0 (как наименьшего) - 0xC2. тогда получается, что в
@@ -129,7 +128,7 @@ impl DecomposingNormalizer
                 continue;
             }
 
-            let code = unsafe { utf8::char_nonascii_bytes_unchecked(iter, first) };
+            let code = unsafe { iter.next_nonascii_bytes_unchecked(first) };
 
             // символ за границами "безопасной зоны". проверяем кейс декомпозиции:
             // если он является обычным стартером без декомпозиции, то продолжаем цикл
@@ -140,7 +139,12 @@ impl DecomposingNormalizer
                 continue;
             }
 
-            let width = utf8::get_utf8_sequence_width(first) as isize;
+            // не учитываем однобайтовый вариант, учитываем, что последовательность валидна
+            let width = match first {
+                0xE0 ..= 0xEF => 3,
+                0xF0 ..= 0xF4 => 4,
+                _ => 2,
+            };
 
             // если мы получили какую-то последовательность символов без декомпозиции:
             //  - сливаем буфер предшествующих этому отрезку нестартеров
